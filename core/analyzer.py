@@ -1,4 +1,4 @@
-"""Main Financial Analyzer - yahooquery primary, single yfinance fallback"""
+"""Main Financial Analyzer - yfinance primary for Indian stocks, yahooquery fallback"""
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -40,44 +40,69 @@ class ProFinancialAnalyzer:
             return INDIAN_STOCKS_DB[ticker]
         return ticker
 
+    def _is_indian_stock(self):
+        """Check if this is an Indian stock"""
+        return self.ticker.endswith('.NS') or self.ticker.endswith('.BO')
+
+    def _try_yfinance(self):
+        """Primary source - works best for all stocks including Indian"""
+        try:
+            stock = _get_cached_ticker(self.ticker)
+            info = stock.info
+            
+            if not info or not isinstance(info, dict) or len(info) < 3:
+                return False, {}, None
+            
+            price = info.get('currentPrice') or info.get('regularMarketPrice')
+            if not price or price <= 0:
+                return False, {}, None
+            
+            # Validate market cap
+            mcap = info.get('marketCap')
+            if not mcap:
+                shares = info.get('sharesOutstanding')
+                if shares and shares > 0:
+                    mcap = price * shares
+                    info['marketCap'] = mcap
+            
+            return True, info, stock
+            
+        except Exception:
+            return False, {}, None
+
     def _try_yahooquery(self):
-        """Try yahooquery first - different API endpoint, less rate limiting"""
+        """Backup source - used when yfinance fails"""
         try:
             from yahooquery import Ticker as YQTicker
             t = YQTicker(self.ticker)
             
-            modules = t.get_modules(['price', 'summaryDetail', 'defaultKeyStatistics', 'financialData'])
-            price_data = modules.get('price', {}).get(self.ticker, {})
-            summary = modules.get('summaryDetail', {}).get(self.ticker, {})
-            stats = modules.get('defaultKeyStatistics', {}).get(self.ticker, {})
-            fin_data = modules.get('financialData', {}).get(self.ticker, {})
-            
-            # ===== FIX: Handle empty dicts from yahooquery =====
-            if not isinstance(price_data, dict) or len(price_data) == 0:
-                price_data = {}
-            if not isinstance(summary, dict):
-                summary = {}
-            if not isinstance(stats, dict):
-                stats = {}
-            if not isinstance(fin_data, dict):
-                fin_data = {}
-            
+            # Try quotes first (more reliable)
             quote = t.quotes
             q = quote[0] if quote and len(quote) > 0 else {}
-            if not isinstance(q, dict):
-                q = {}
             
-            # Safe getter for nested dicts that may be empty
+            if not isinstance(q, dict) or not q.get('regularMarketPrice'):
+                return False, {}
+            
+            current_price = q.get('regularMarketPrice')
+            
+            # Try to get additional data from modules
+            try:
+                modules = t.get_modules(['price', 'summaryDetail', 'defaultKeyStatistics', 'financialData'])
+                price_data = modules.get('price', {}).get(self.ticker, {}) or {}
+                summary = modules.get('summaryDetail', {}).get(self.ticker, {}) or {}
+                stats = modules.get('defaultKeyStatistics', {}).get(self.ticker, {}) or {}
+                fin_data = modules.get('financialData', {}).get(self.ticker, {}) or {}
+            except:
+                price_data = {}
+                summary = {}
+                stats = {}
+                fin_data = {}
+            
             def _safe_raw(d, key):
-                val = d.get(key, {})
+                val = d.get(key, {}) if isinstance(d, dict) else {}
                 if isinstance(val, dict):
                     return val.get('raw')
                 return val
-            
-            current_price = _safe_raw(price_data, 'regularMarketPrice') or q.get('regularMarketPrice')
-            
-            if not current_price or current_price <= 0:
-                return False, {}
             
             info = {
                 'currentPrice': current_price,
@@ -91,12 +116,11 @@ class ProFinancialAnalyzer:
                 'beta': _safe_raw(stats, 'beta') or q.get('beta'),
                 'trailingPE': _safe_raw(summary, 'trailingPE') or q.get('trailingPE'),
                 'returnOnEquity': _safe_raw(fin_data, 'returnOnEquity') or q.get('returnOnEquity'),
-                'returnOnAssets': _safe_raw(fin_data, 'returnOnAssets'),
                 'debtToEquity': _safe_raw(fin_data, 'debtToEquity') or q.get('debtToEquity'),
                 'profitMargins': _safe_raw(fin_data, 'profitMargins') or q.get('profitMargins'),
                 'revenueGrowth': _safe_raw(fin_data, 'revenueGrowth') or q.get('revenueGrowth'),
                 'dividendYield': _safe_raw(summary, 'dividendYield') or q.get('dividendYield'),
-                'recommendationKey': fin_data.get('recommendationKey') or q.get('recommendationKey'),
+                'recommendationKey': q.get('recommendationKey'),
                 'fiftyTwoWeekHigh': _safe_raw(summary, 'fiftyTwoWeekHigh') or q.get('fiftyTwoWeekHigh'),
                 'fiftyTwoWeekLow': _safe_raw(summary, 'fiftyTwoWeekLow') or q.get('fiftyTwoWeekLow'),
                 'longName': q.get('longName', self.original_ticker),
@@ -106,43 +130,12 @@ class ProFinancialAnalyzer:
                 'sharesOutstanding': _safe_raw(stats, 'sharesOutstanding') or q.get('sharesOutstanding'),
             }
             
-            # ===== SMART FALLBACK: Only fetch missing critical data from yfinance =====
-            missing_mcap = not info.get('marketCap')
-            missing_price = not info.get('currentPrice')
+            # Calculate market cap if missing
+            if not info.get('marketCap') and info.get('sharesOutstanding') and current_price:
+                info['marketCap'] = info['sharesOutstanding'] * current_price
             
-            if missing_mcap or missing_price:
-                try:
-                    stock = _get_cached_ticker(self.ticker)
-                    yf_info = stock.info
-                    
-                    if yf_info and isinstance(yf_info, dict):
-                        if missing_mcap:
-                            if yf_info.get('marketCap'):
-                                info['marketCap'] = yf_info['marketCap']
-                            elif yf_info.get('sharesOutstanding') and info.get('currentPrice'):
-                                info['marketCap'] = yf_info['sharesOutstanding'] * info['currentPrice']
-                        
-                        if missing_price and yf_info.get('currentPrice'):
-                            info['currentPrice'] = yf_info['currentPrice']
-                            info['regularMarketPrice'] = yf_info['currentPrice']
-                        
-                        # Fill missing ratios
-                        for key in ['trailingPE', 'returnOnEquity', 'debtToEquity',
-                                     'profitMargins', 'revenueGrowth', 'dividendYield',
-                                     'beta', 'returnOnAssets', 'priceToBook', 'trailingEps']:
-                            if not info.get(key) and yf_info.get(key):
-                                info[key] = yf_info[key]
-                except:
-                    pass
-            
-            # Calculate market cap from shares if still missing
-            if not info.get('marketCap') and info.get('sharesOutstanding') and info.get('currentPrice'):
-                info['marketCap'] = info['sharesOutstanding'] * info['currentPrice']
-            
-            # Clean None values
             info = {k: v for k, v in info.items() if v is not None}
             
-            # Final validation
             if not info.get('currentPrice') or info['currentPrice'] <= 0:
                 return False, {}
             
@@ -150,31 +143,6 @@ class ProFinancialAnalyzer:
             
         except Exception:
             return False, {}
-
-    def _try_yfinance(self):
-        """Single yfinance call - uses cached ticker"""
-        try:
-            stock = _get_cached_ticker(self.ticker)
-            info = stock.info
-            
-            if not info or not isinstance(info, dict) or len(info) < 3:
-                return False, {}, None
-            
-            price = info.get('currentPrice') or info.get('regularMarketPrice')
-            if not price or price <= 0:
-                return False, {}, None
-            
-            mcap = info.get('marketCap')
-            if not mcap:
-                shares = info.get('sharesOutstanding')
-                if shares and shares > 0:
-                    mcap = price * shares
-                    info['marketCap'] = mcap
-            
-            return True, info, stock
-            
-        except Exception:
-            return False, {}, None
 
     def _try_api_fallback(self):
         """Last resort - Twelve Data / Alpha Vantage (price only)"""
@@ -202,16 +170,14 @@ class ProFinancialAnalyzer:
         return {}, None
 
     def get_live_price(self):
-        """Priority: 1) yahooquery 2) yfinance 3) API fallbacks"""
+        """
+        Priority:
+        1. yfinance (primary - works for all stocks including Indian)
+        2. yahooquery (backup)
+        3. API fallbacks (price only)
+        """
         
-        success, info = self._try_yahooquery()
-        if success and info.get('currentPrice'):
-            self._populate_from_info(info)
-            self._info_cache = info
-            self.data_source = 'Yahoo Finance (yahooquery)'
-            self.stock = _get_cached_ticker(self.ticker)
-            return True
-
+        # Try 1: yfinance - PRIMARY (most reliable for Indian stocks)
         success, info, stock = self._try_yfinance()
         if success:
             self._populate_from_info(info)
@@ -220,6 +186,16 @@ class ProFinancialAnalyzer:
             self.data_source = 'Yahoo Finance'
             return True
 
+        # Try 2: yahooquery - BACKUP
+        success, info = self._try_yahooquery()
+        if success and info.get('currentPrice'):
+            self._populate_from_info(info)
+            self._info_cache = info
+            self.data_source = 'Yahoo Finance (yahooquery)'
+            self.stock = _get_cached_ticker(self.ticker)
+            return True
+
+        # Try 3: API fallbacks - price only
         info, source = self._try_api_fallback()
         if info:
             self.live_price_data = {'current_price': info.get('currentPrice')}
