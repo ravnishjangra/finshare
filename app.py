@@ -46,10 +46,10 @@ def get_all_stocks():
 ALL_STOCKS = get_all_stocks()
 
 @st.cache_resource
-def get_analyzer(_ticker, _exchange):
+def get_analyzer(ticker, exchange):
     """Cache the analyzer to avoid repeated API calls"""
     em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
-    analyzer = ProFinancialAnalyzer(_ticker.upper().strip(), exchange=em.get(_exchange, "Auto"))
+    analyzer = ProFinancialAnalyzer(ticker.upper().strip(), exchange=em.get(exchange, "Auto"))
     analyzer.get_live_price()
     analyzer.fetch_financial_data()
     analyzer.calculate_all_ratios()
@@ -59,7 +59,6 @@ def main():
     st.markdown('<h1 class="main-header">📊 Finshare Pro</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Advanced DCF • Stress Tests • Portfolio Optimizer • Technical Analysis</p>', unsafe_allow_html=True)
 
-    # Initialize session state
     if 'current_ticker' not in st.session_state:
         st.session_state['current_ticker'] = "AAPL"
     if 'current_exchange' not in st.session_state:
@@ -85,7 +84,6 @@ def main():
             )
         
         with c2:
-            # Determine exchange
             ticker_upper = ticker_input.upper().strip() if ticker_input else ''
             
             if ticker_upper in ALL_STOCKS:
@@ -111,13 +109,11 @@ def main():
             st.write("")
             analyze_btn = st.button("🔍 Analyze", type="primary", use_container_width=True)
 
-        # Update session state from inputs
         if ticker_input:
             st.session_state['current_ticker'] = ticker_input.upper().strip()
         if exchange:
             st.session_state['current_exchange'] = exchange
 
-        # Suggestions
         if ticker_input and len(ticker_input) >= 1:
             search_term = ticker_input.upper().strip()
             suggestions = [s for s in ALL_STOCKS if search_term in s][:8]
@@ -135,12 +131,10 @@ def main():
             else:
                 st.caption(f"'{ticker_input}' not in quick list but will be searched on Yahoo Finance.")
 
-        # Handle analyze button
         if analyze_btn:
             st.session_state['analyze_clicked'] = True
-            st.rerun()  # Force rerun to use updated session state
+            st.rerun()
 
-        # Display results if analyze was clicked
         if st.session_state['analyze_clicked'] and st.session_state['current_ticker']:
             ticker_to_analyze = st.session_state['current_ticker']
             exchange_to_use = st.session_state['current_exchange']
@@ -213,7 +207,6 @@ def main():
         elif not st.session_state.get('analyze_clicked'):
             st.markdown('<div style="text-align:center;padding:4rem;"><h2>🏦 Finshare Pro</h2><p>Type any ticker above, select exchange, and click Analyze</p><p style="color:#94a3b8;">Works for ALL Indian stocks (.NS) and US stocks</p></div>', unsafe_allow_html=True)
 
-    # Tabs 2-5 remain the same...
     with tab2:
         st.markdown("### 🛡️ Stress Tests")
         col1, col2 = st.columns([2, 1])
