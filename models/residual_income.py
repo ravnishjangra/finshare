@@ -17,20 +17,35 @@ class ResidualIncome:
             col = income_df.columns[0]
             bal_col = balance_df.columns[0]
             
-            # Get required data
-            ni = next((income_df.loc[k, col] for k in ['Net Income', 'Net Income Common Stockholders'] 
-                      if k in income_df.index), None)
-            eq = next((balance_df.loc[k, bal_col] for k in ['Stockholders Equity', 'Total Stockholder Equity', 
-                                                            'Total Equity', 'Common Stock Equity'] 
-                      if k in balance_df.index), None)
+            # Get Net Income - try multiple keys
+            ni = None
+            for k in ['Net Income', 'Net Income Common Stockholders', 'Net Income From Continuing Operation Net Minority Interest']:
+                if k in income_df.index:
+                    ni = income_df.loc[k, col]
+                    if pd.notna(ni) and ni != 0:
+                        break
+            
+            # Get Equity - try multiple keys
+            eq = None
+            for k in ['Stockholders Equity', 'Total Stockholder Equity', 'Total Equity', 
+                      'Common Stock Equity', 'Total Equity Gross Minority Interest']:
+                if k in balance_df.index:
+                    eq = balance_df.loc[k, bal_col]
+                    if pd.notna(eq) and eq > 0:
+                        break
             
             # Get shares
-            shares = next((income_df.loc[k, col] for k in ['Diluted Average Shares', 'Basic Average Shares'] 
-                          if k in income_df.index), None)
+            shares = None
+            for k in ['Diluted Average Shares', 'Basic Average Shares', 'Ordinary Shares Number']:
+                if k in income_df.index:
+                    shares = income_df.loc[k, col]
+                    if pd.notna(shares) and shares > 0:
+                        break
+            
             if not shares:
                 shares = info.get('sharesOutstanding', 1)
             
-            if not ni or not eq or not shares or shares <= 0:
+            if not ni or not eq or not shares or shares <= 0 or eq <= 0:
                 return None
             
             bvps = eq / shares
@@ -43,9 +58,9 @@ class ResidualIncome:
             # Current residual income
             residual_income = eps - (bvps * cost_of_equity)
             
-            # Growth assumption (use ROE - Cost of Equity as growth proxy)
+            # Growth assumption
             roe = ni / eq if eq > 0 else 0.10
-            growth = max(0, min(roe - cost_of_equity, 0.05))  # Cap at 5%
+            growth = max(0, min(roe - cost_of_equity, 0.05))
             
             # PV of residual income (10 year projection)
             pv_ri = 0
@@ -59,6 +74,10 @@ class ResidualIncome:
             pv_terminal = terminal_ri / (1 + cost_of_equity) ** 10
             
             intrinsic_bvps = bvps + pv_ri + pv_terminal
+            
+            if intrinsic_bvps <= 0 or np.isnan(intrinsic_bvps):
+                return None
+            
             upside = ((intrinsic_bvps / current_price) - 1) * 100 if current_price > 0 else 0
             
             if upside > 20:
