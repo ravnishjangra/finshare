@@ -1,9 +1,8 @@
-"""Main Financial Analyzer - Multi-source with working fallbacks"""
+"""Main Financial Analyzer - yahooquery primary, multi-source fallback"""
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import requests
-import streamlit as st
 from config import CURRENCY_SYMBOLS, INDIAN_STOCKS_DB
 
 class ProFinancialAnalyzer:
@@ -25,43 +24,10 @@ class ProFinancialAnalyzer:
         elif ticker in INDIAN_STOCKS_DB: return INDIAN_STOCKS_DB[ticker]
         return ticker
 
-    def _try_twelve_data(self):
-        """Try Twelve Data API for price"""
-        api_key = "d697a0e8caf443d8b644e82f7e03f70b"
-        try:
-            url = f"https://api.twelvedata.com/price?symbol={self.ticker}&apikey={api_key}"
-            resp = requests.get(url, timeout=8)
-            if resp.status_code == 200:
-                data = resp.json()
-                if 'price' in data and float(data['price']) > 0:
-                    self.live_price_data = {'current_price': float(data['price'])}
-                    self.data_source = 'Twelve Data'
-                    return True
-        except:
-            pass
-        return False
-
-    def _try_alpha_vantage(self):
-        """Try Alpha Vantage API for price"""
-        api_key = "KRERC8NQM61HUNI3"
-        try:
-            url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={self.ticker}&apikey={api_key}"
-            resp = requests.get(url, timeout=8)
-            data = resp.json()
-            if 'Global Quote' in data:
-                price = float(data['Global Quote'].get('05. price', 0))
-                if price > 0:
-                    self.live_price_data = {'current_price': price}
-                    self.data_source = 'Alpha Vantage'
-                    return True
-        except:
-            pass
-        return False
-
     def get_live_price(self):
-        """Try all sources until one works"""
+        """Try yahooquery first - gives price + market cap + beta"""
         
-        # Try 1: yahooquery (best for Cloud)
+        # Try 1: yahooquery (best - gives price, mcap, beta in one call)
         try:
             from yahooquery import Ticker as YQTicker
             t = YQTicker(self.ticker)
@@ -75,7 +41,13 @@ class ProFinancialAnalyzer:
                             'current_price': price,
                             'market_cap': q.get('marketCap'),
                             'previous_close': q.get('regularMarketPreviousClose'),
+                            'open': q.get('regularMarketOpen'),
+                            'day_high': q.get('regularMarketDayHigh'),
+                            'day_low': q.get('regularMarketDayLow'),
+                            'volume': q.get('regularMarketVolume'),
                             'beta': q.get('beta'),
+                            'fifty_two_week_high': q.get('fiftyTwoWeekHigh'),
+                            'fifty_two_week_low': q.get('fiftyTwoWeekLow'),
                         }
                         self.live_price_data = {k: v for k, v in self.live_price_data.items() if v is not None}
                         self.data_source = 'Yahoo Finance'
@@ -85,16 +57,35 @@ class ProFinancialAnalyzer:
             pass
 
         # Try 2: Twelve Data
-        if self._try_twelve_data():
-            self.stock = yf.Ticker(self.ticker)
-            return True
+        try:
+            url = f"https://api.twelvedata.com/price?symbol={self.ticker}&apikey=d697a0e8caf443d8b644e82f7e03f70b"
+            resp = requests.get(url, timeout=8)
+            if resp.status_code == 200:
+                data = resp.json()
+                if 'price' in data and float(data['price']) > 0:
+                    self.live_price_data = {'current_price': float(data['price'])}
+                    self.data_source = 'Twelve Data'
+                    self.stock = yf.Ticker(self.ticker)
+                    return True
+        except:
+            pass
 
         # Try 3: Alpha Vantage
-        if self._try_alpha_vantage():
-            self.stock = yf.Ticker(self.ticker)
-            return True
+        try:
+            url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={self.ticker}&apikey=KRERC8NQM61HUNI3"
+            resp = requests.get(url, timeout=8)
+            data = resp.json()
+            if 'Global Quote' in data:
+                price = float(data['Global Quote'].get('05. price', 0))
+                if price > 0:
+                    self.live_price_data = {'current_price': price}
+                    self.data_source = 'Alpha Vantage'
+                    self.stock = yf.Ticker(self.ticker)
+                    return True
+        except:
+            pass
 
-        # Try 4: Yahoo Finance direct
+        # Try 4: yfinance info
         try:
             self.stock = yf.Ticker(self.ticker)
             info = self.stock.info
@@ -107,7 +98,7 @@ class ProFinancialAnalyzer:
         except:
             pass
 
-        # Try 5: Yahoo Finance history
+        # Try 5: yfinance history (last resort - no market cap)
         try:
             if self.stock is None:
                 self.stock = yf.Ticker(self.ticker)
@@ -120,26 +111,6 @@ class ProFinancialAnalyzer:
                     return True
         except:
             pass
-
-        # Try 6: Alternate exchange
-        alts = []
-        if self.ticker.endswith('.NS'): alts = [self.ticker.replace('.NS', '.BO')]
-        elif self.ticker.endswith('.BO'): alts = [self.ticker.replace('.BO', '.NS')]
-        else: alts = [self.ticker + '.NS', self.ticker + '.BO']
-        
-        for alt in alts:
-            try:
-                s = yf.Ticker(alt)
-                i = s.info
-                if i and isinstance(i, dict) and len(i) > 3:
-                    p = i.get('currentPrice') or i.get('regularMarketPrice')
-                    if p and p > 0:
-                        self.stock = s; self.ticker = alt
-                        self._populate_from_info(i)
-                        self.data_source = 'Yahoo Finance (alt)'
-                        return True
-            except:
-                pass
 
         return False
 
@@ -187,6 +158,8 @@ class ProFinancialAnalyzer:
                             'returnOnEquity': q.get('returnOnEquity'),
                             'debtToEquity': q.get('debtToEquity'),
                             'profitMargins': q.get('profitMargins'),
+                            'revenueGrowth': q.get('revenueGrowth'),
+                            'dividendYield': q.get('dividendYield'),
                         }
             except:
                 pass
@@ -247,51 +220,10 @@ class ProFinancialAnalyzer:
         try:
             income = self.financials.get('income')
             balance = self.financials.get('balance')
-            prices = self.financials.get('prices')
             cp = self.live_price_data.get('current_price')
             info = self.financials.get('info', {})
 
-            if income is not None and not income.empty:
-                rev = self._safe_get(income, ['Total Revenue', 'Revenue'])
-                ni = self._safe_get(income, ['Net Income', 'Net Income Common Stockholders'])
-                gp = self._safe_get(income, ['Gross Profit'])
-                oi = self._safe_get(income, ['Operating Income', 'EBIT'])
-                rev_p = self._safe_get(income, ['Total Revenue', 'Revenue'], 1)
-
-                if rev and rev > 0:
-                    if ni: self.ratios['Net Profit Margin'] = (ni/rev)*100
-                    if gp: self.ratios['Gross Profit Margin'] = (gp/rev)*100
-                    if oi: self.ratios['Operating Margin'] = (oi/rev)*100
-                    if rev_p and rev_p > 0: self.ratios['Revenue Growth (YoY)'] = ((rev-rev_p)/rev_p)*100
-
-                ni_p = self._safe_get(income, ['Net Income', 'Net Income Common Stockholders'], 1)
-                if ni and ni_p and ni_p != 0: self.ratios['Net Income Growth (YoY)'] = ((ni-ni_p)/ni_p)*100
-
-                if balance is not None and not balance.empty:
-                    eq = self._safe_get(balance, ['Stockholders Equity', 'Total Stockholder Equity', 'Total Equity'])
-                    ast = self._safe_get(balance, ['Total Assets'])
-                    ca = self._safe_get(balance, ['Current Assets'])
-                    cl = self._safe_get(balance, ['Current Liabilities'])
-                    td = self._safe_get(balance, ['Total Debt']) or self._safe_get(balance, ['Long Term Debt'])
-                    if eq and eq > 0:
-                        if ni: self.ratios['ROE'] = (ni/eq)*100
-                        if td: self.ratios['Debt to Equity'] = td/eq
-                    if ast and ast > 0 and ni: self.ratios['ROA'] = (ni/ast)*100
-                    if ca and cl and cl > 0:
-                        self.ratios['Current Ratio'] = ca/cl
-                        inv = self._safe_get(balance, ['Inventory', 'Inventories'])
-                        if inv: self.ratios['Quick Ratio'] = (ca-inv)/cl
-                    if rev and ast and ast > 0: self.ratios['Asset Turnover'] = rev/ast
-
-                if cp and cp > 0:
-                    shares = self._safe_get(income, ['Diluted Average Shares']) or self._safe_get(income, ['Basic Average Shares'])
-                    if shares and shares > 0:
-                        if ni:
-                            eps = ni/shares; self.ratios['EPS'] = eps
-                            if eps > 0: self.ratios['P/E Ratio'] = cp/eps
-                        if eq and eq > 0: self.ratios['P/B Ratio'] = cp/(eq/shares)
-                        if rev and rev > 0: self.ratios['P/S Ratio'] = cp/(rev/shares)
-
+            # First get ratios from info dict (from yahooquery)
             if isinstance(info, dict):
                 for key, ratio_key, mult in [
                     ('returnOnEquity', 'ROE', 100), ('returnOnAssets', 'ROA', 100),
@@ -300,10 +232,41 @@ class ProFinancialAnalyzer:
                     ('trailingEps', 'EPS', 1), ('revenueGrowth', 'Revenue Growth (YoY)', 100),
                     ('dividendYield', 'Dividend Yield', 100), ('currentRatio', 'Current Ratio', 1),
                 ]:
-                    if ratio_key not in self.ratios and info.get(key):
+                    if info.get(key):
                         try: self.ratios[ratio_key] = info[key] * mult
                         except: pass
-            
+
+            # Supplement with financial statements if available
+            if income is not None and not income.empty:
+                rev = self._safe_get(income, ['Total Revenue', 'Revenue'])
+                ni = self._safe_get(income, ['Net Income', 'Net Income Common Stockholders'])
+                gp = self._safe_get(income, ['Gross Profit'])
+                oi = self._safe_get(income, ['Operating Income', 'EBIT'])
+                rev_p = self._safe_get(income, ['Total Revenue', 'Revenue'], 1)
+
+                if rev and rev > 0:
+                    if ni and 'Net Profit Margin' not in self.ratios:
+                        self.ratios['Net Profit Margin'] = (ni/rev)*100
+                    if gp and 'Gross Profit Margin' not in self.ratios:
+                        self.ratios['Gross Profit Margin'] = (gp/rev)*100
+                    if oi and 'Operating Margin' not in self.ratios:
+                        self.ratios['Operating Margin'] = (oi/rev)*100
+                    if rev_p and rev_p > 0 and 'Revenue Growth (YoY)' not in self.ratios:
+                        self.ratios['Revenue Growth (YoY)'] = ((rev-rev_p)/rev_p)*100
+
+                if balance is not None and not balance.empty:
+                    eq = self._safe_get(balance, ['Stockholders Equity', 'Total Stockholder Equity', 'Total Equity'])
+                    ast = self._safe_get(balance, ['Total Assets'])
+                    ca = self._safe_get(balance, ['Current Assets'])
+                    cl = self._safe_get(balance, ['Current Liabilities'])
+                    
+                    if eq and eq > 0 and ni:
+                        if 'ROE' not in self.ratios: self.ratios['ROE'] = (ni/eq)*100
+                    if ast and ast > 0 and ni:
+                        if 'ROA' not in self.ratios: self.ratios['ROA'] = (ni/ast)*100
+                    if ca and cl and cl > 0:
+                        if 'Current Ratio' not in self.ratios: self.ratios['Current Ratio'] = ca/cl
+
             self.ratios = {k: v for k, v in self.ratios.items() if v is not None}
             return True
         except: return True
