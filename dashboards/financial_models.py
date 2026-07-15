@@ -1,6 +1,8 @@
 """Financial Models Dashboard - Performance, Beneish, DuPont, Composite, Ohlson, Fear & Greed"""
 import streamlit as st
 import plotly.graph_objects as go
+import pandas as pd
+import numpy as np
 from models.beneish import BeneishMScore
 from models.dupont import DuPontAnalysis
 from models.performance_ratios import PerformanceRatios
@@ -57,8 +59,9 @@ def create_financial_models_dashboard(analyzer):
         
         with col2:
             for factor, score in fg['factors'].items():
-                bar = '█' * int(score) + '░' * (25 - int(score))
-                factor_color = '#10b981' if score > 15 else '#f59e0b' if score > 8 else '#ef4444'
+                s = int(score) if pd.notna(score) and not np.isnan(score) else 12
+                bar = '█' * s + '░' * (25 - s)
+                factor_color = '#10b981' if s > 15 else '#f59e0b' if s > 8 else '#ef4444'
                 st.markdown(f"**{factor}**: <span style='color:{factor_color}'>{bar}</span> {score}/25", unsafe_allow_html=True)
     
     # ===== SECTION 2: PERFORMANCE METRICS =====
@@ -125,7 +128,7 @@ def create_financial_models_dashboard(analyzer):
         st.markdown("**Altman Z-Score**")
         st.caption("Bankruptcy prediction")
         z_score = AltmanZScore.calculate(balance, income, market_cap)
-        if z_score and z_score.get('z_score'):
+        if z_score and z_score.get('z_score') and not pd.isna(z_score['z_score']):
             st.markdown(f"<h2 style='color:{z_score.get('color','#94a3b8')};text-align:center;'>{z_score['z_score']:.2f}</h2>", unsafe_allow_html=True)
             st.markdown(f"<p style='text-align:center;color:{z_score.get('color','#94a3b8')};'><b>{z_score['zone']}</b></p>", unsafe_allow_html=True)
             st.caption(f"Probability: {z_score.get('probability','N/A')}")
@@ -229,5 +232,6 @@ def create_financial_models_dashboard(analyzer):
     
     with col2:
         for category, score in composite['breakdown'].items():
-            bar = '█' * (score // 10) + '░' * (10 - score // 10)
-            st.markdown(f"**{category}**: {bar} {score}%")
+            s = int(score) if pd.notna(score) and not np.isnan(score) else 0
+            bar = '█' * (s // 10) + '░' * (10 - s // 10)
+            st.markdown(f"**{category}**: {bar} {s}%")
