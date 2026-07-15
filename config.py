@@ -26,4 +26,10 @@ PEER_GROUPS = {
     'Energy_India': ['RELIANCE.NS', 'ONGC.NS', 'COALINDIA.NS', 'NTPC.NS', 'POWERGRID.NS'],
     'Finance_US': ['JPM', 'BAC', 'WFC', 'GS', 'MS'],
     'Consumer_India': ['ITC.NS', 'HINDUNILVR.NS', 'NESTLEIND.NS', 'TITAN.NS', 'ASIANPAINT.NS'],
+    'Metal_India': ['TATASTEEL.NS', 'JSWSTEEL.NS', 'HINDZINC.NS', 'VEDL.NS', 'NATIONALUM.NS'],
+    'Oil_Gas_India': ['RELIANCE.NS', 'ONGC.NS', 'IOC.NS', 'BPCL.NS', 'HPCL.NS'],
+    'Power_India': ['NTPC.NS', 'POWERGRID.NS', 'TATAPOWER.NS', 'ADANIPOWER.NS', 'JSWENERGY.NS'],
+    'Cement_India': ['ULTRACEMCO.NS', 'GRASIM.NS', 'AMBUJACEM.NS', 'SHREECEM.NS', 'ACC.NS'],
+    'FMCG_India': ['HINDUNILVR.NS', 'NESTLEIND.NS', 'BRITANNIA.NS', 'DABUR.NS', 'MARICO.NS'],
+    'Realty_India': ['DLF.NS', 'GODREJPROP.NS', 'OBEROIRLTY.NS', 'PRESTIGE.NS', 'BRIGADE.NS'],
 }
