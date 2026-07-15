@@ -39,7 +39,20 @@ class ProFinancialAnalyzer:
         except:
             pass
 
-        # Try 2: Multi-source fallback
+        # Try 2: Yahoo Finance history (works even when info fails)
+        try:
+            self.stock = yf.Ticker(self.ticker)
+            hist = self.stock.history(period='1d')
+            if not hist.empty and 'Close' in hist.columns:
+                last = hist['Close'].iloc[-1]
+                if pd.notna(last) and last > 0:
+                    self.live_price_data = {'current_price': float(last)}
+                    self.data_source = 'Yahoo Finance (history)'
+                    return True
+        except:
+            pass
+
+        # Try 3: Multi-source fallback
         result = MultiSourceFetcher.fetch_price(self.ticker)
         if result and result.get('current_price', 0) > 0:
             self.live_price_data = {

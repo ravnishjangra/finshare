@@ -11,16 +11,17 @@ class MultiSourceFetcher:
         """Try multiple sources until one returns a valid price"""
         sources = [
             ('yahooquery', MultiSourceFetcher._try_yahooquery),
+            ('yfinance_history', MultiSourceFetcher._try_yfinance_history),
             ('twelvedata', MultiSourceFetcher._try_twelvedata),
             ('alphavantage', MultiSourceFetcher._try_alphavantage),
             ('google', MultiSourceFetcher._try_google_finance),
-            ('yfinance_history', MultiSourceFetcher._try_yfinance_history),
         ]
         
         for name, func in sources:
             try:
                 result = func(ticker)
                 if result and result.get('current_price') and result['current_price'] > 0:
+                    st.info(f"📡 Data source: {name}")
                     return result
             except:
                 continue
@@ -39,9 +40,26 @@ class MultiSourceFetcher:
         return None
 
     @staticmethod
+    def _try_yfinance_history(ticker):
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period='5d')
+            if not hist.empty and 'Close' in hist.columns:
+                last = hist['Close'].iloc[-1]
+                if pd.notna(last) and last > 0:
+                    return {'current_price': float(last), 'source': 'Yahoo Finance (history)'}
+        except:
+            pass
+        return None
+
+    @staticmethod
     def _try_twelvedata(ticker):
-        api_key = st.secrets.get("TWELVEDATA_API_KEY", "")
-        if not api_key: return None
+        try:
+            api_key = st.secrets.get("TWELVEDATA_API_KEY", "")
+        except:
+            api_key = ""
+        if not api_key:
+            return None
         try:
             url = f"https://api.twelvedata.com/price?symbol={ticker}&apikey={api_key}"
             resp = requests.get(url, timeout=8)
@@ -55,8 +73,12 @@ class MultiSourceFetcher:
 
     @staticmethod
     def _try_alphavantage(ticker):
-        api_key = st.secrets.get("ALPHAVANTAGE_API_KEY", "")
-        if not api_key: return None
+        try:
+            api_key = st.secrets.get("ALPHAVANTAGE_API_KEY", "")
+        except:
+            api_key = ""
+        if not api_key:
+            return None
         try:
             url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={api_key}"
             resp = requests.get(url, timeout=8)
@@ -83,19 +105,6 @@ class MultiSourceFetcher:
                     price = float(match.group(1).replace(',', ''))
                     if price > 0:
                         return {'current_price': price, 'source': 'Google Finance'}
-        except:
-            pass
-        return None
-
-    @staticmethod
-    def _try_yfinance_history(ticker):
-        try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period='5d')
-            if not hist.empty and 'Close' in hist.columns:
-                last = hist['Close'].iloc[-1]
-                if pd.notna(last) and last > 0:
-                    return {'current_price': float(last), 'source': 'Yahoo Finance (history)'}
         except:
             pass
         return None
