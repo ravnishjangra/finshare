@@ -45,16 +45,6 @@ def get_all_stocks():
 
 ALL_STOCKS = get_all_stocks()
 
-@st.cache_resource
-def get_analyzer(ticker, exchange):
-    """Cache the analyzer to avoid repeated API calls"""
-    em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
-    analyzer = ProFinancialAnalyzer(ticker.upper().strip(), exchange=em.get(exchange, "Auto"))
-    analyzer.get_live_price()
-    analyzer.fetch_financial_data()
-    analyzer.calculate_all_ratios()
-    return analyzer
-
 def main():
     st.markdown('<h1 class="main-header">📊 Finshare Pro</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Advanced DCF • Stress Tests • Portfolio Optimizer • Technical Analysis</p>', unsafe_allow_html=True)
@@ -85,7 +75,6 @@ def main():
         
         with c2:
             ticker_upper = ticker_input.upper().strip() if ticker_input else ''
-            
             if ticker_upper in ALL_STOCKS:
                 default_exchange = ALL_STOCKS[ticker_upper][0]
             elif ticker_upper.endswith('.NS'):
@@ -98,26 +87,26 @@ def main():
             exchange_options = ["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"]
             default_idx = exchange_options.index(default_exchange) if default_exchange in exchange_options else 0
             
-            exchange = st.selectbox(
-                "Exchange",
-                exchange_options,
-                index=default_idx,
-                key="main_exchange_widget"
-            )
+            exchange = st.selectbox("Exchange", exchange_options, index=default_idx, key="main_exchange_widget")
         
         with c3:
             st.write("")
             analyze_btn = st.button("🔍 Analyze", type="primary", use_container_width=True)
 
+        # Update session state
         if ticker_input:
             st.session_state['current_ticker'] = ticker_input.upper().strip()
         if exchange:
             st.session_state['current_exchange'] = exchange
 
+        # Handle analyze button - set state directly, no rerun needed
+        if analyze_btn:
+            st.session_state['analyze_clicked'] = True
+
+        # Suggestions
         if ticker_input and len(ticker_input) >= 1:
             search_term = ticker_input.upper().strip()
             suggestions = [s for s in ALL_STOCKS if search_term in s][:8]
-            
             if suggestions:
                 st.markdown("#### 💡 Suggestions")
                 cols = st.columns(min(len(suggestions), 4))
@@ -131,17 +120,18 @@ def main():
             else:
                 st.caption(f"'{ticker_input}' not in quick list but will be searched on Yahoo Finance.")
 
-        if analyze_btn:
-            st.session_state['analyze_clicked'] = True
-            st.rerun()
-
+        # Display results
         if st.session_state['analyze_clicked'] and st.session_state['current_ticker']:
             ticker_to_analyze = st.session_state['current_ticker']
             exchange_to_use = st.session_state['current_exchange']
             
             with st.spinner(f"🔍 Fetching data for {ticker_to_analyze}..."):
                 try:
-                    analyzer = get_analyzer(ticker_to_analyze, exchange_to_use)
+                    em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
+                    analyzer = ProFinancialAnalyzer(ticker_to_analyze, exchange=em.get(exchange_to_use, "Auto"))
+                    analyzer.get_live_price()
+                    analyzer.fetch_financial_data()
+                    analyzer.calculate_all_ratios()
                     
                     if not analyzer.live_price_data.get('current_price'):
                         st.error(f"❌ Could not fetch data for **{ticker_to_analyze}**. Try again in a moment.")
@@ -220,8 +210,10 @@ def main():
             else:
                 with st.spinner("Running stress tests..."):
                     try:
-                        a2 = get_analyzer(st2_t, st2_e)
-                        if a2.live_price_data.get('current_price'):
+                        em2 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
+                        a2 = ProFinancialAnalyzer(st2_t.strip().upper(), exchange=em2.get(st2_e, "Auto"))
+                        if a2.get_live_price():
+                            a2.fetch_financial_data()
                             create_stress_test_dashboard(a2)
                         else:
                             st.error("Could not fetch data. Try again.")
@@ -241,8 +233,10 @@ def main():
             else:
                 with st.spinner("Calculating..."):
                     try:
-                        a3 = get_analyzer(ta_t, ta_e)
-                        if a3.live_price_data.get('current_price'):
+                        em3 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
+                        a3 = ProFinancialAnalyzer(ta_t.strip().upper(), exchange=em3.get(ta_e, "Auto"))
+                        if a3.get_live_price():
+                            a3.fetch_financial_data()
                             create_technical_dashboard(a3)
                         else:
                             st.error("Could not fetch data. Try again.")
