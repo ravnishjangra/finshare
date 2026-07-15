@@ -330,48 +330,96 @@ class ProFinancialAnalyzer:
         try:
             income = self.financials.get('income')
             balance = self.financials.get('balance')
+            cashflow = self.financials.get('cashflow')
             info = self.financials.get('info', {})
+            cp = self.live_price_data.get('current_price')
 
-            # ===== SANITY LIMITS for ratios =====
+            # ===== SANITY LIMITS =====
             LIMITS = {
-                'Dividend Yield': (0, 50),
                 'Debt to Equity': (0, 20),
                 'P/E Ratio': (0, 1000),
                 'P/B Ratio': (0, 100),
+                'P/S Ratio': (0, 100),
                 'ROE': (-100, 100),
                 'ROA': (-100, 100),
+                'ROCE': (-100, 100),
                 'Net Profit Margin': (-100, 100),
+                'Gross Profit Margin': (0, 100),
+                'Operating Margin': (-100, 100),
+                'EBITDA Margin': (0, 100),
                 'Revenue Growth (YoY)': (-200, 500),
+                'Earnings Growth (YoY)': (-200, 500),
             }
 
+            # ===== FROM YFINANCE INFO =====
             if isinstance(info, dict):
                 ratio_map = [
-                    ('returnOnEquity', 'ROE', 100), ('returnOnAssets', 'ROA', 100),
-                    ('profitMargins', 'Net Profit Margin', 100), ('debtToEquity', 'Debt to Equity', 1),
-                    ('trailingPE', 'P/E Ratio', 1), ('priceToBook', 'P/B Ratio', 1),
-                    ('trailingEps', 'EPS', 1), ('revenueGrowth', 'Revenue Growth (YoY)', 100),
-                    ('dividendYield', 'Dividend Yield', 100), ('currentRatio', 'Current Ratio', 1),
+                    ('returnOnEquity', 'ROE', 100),
+                    ('returnOnAssets', 'ROA', 100),
+                    ('profitMargins', 'Net Profit Margin', 100),
+                    ('debtToEquity', 'Debt to Equity', 1),
+                    ('trailingPE', 'P/E Ratio', 1),
+                    ('priceToBook', 'P/B Ratio', 1),
+                    ('trailingEps', 'EPS', 1),
+                    ('revenueGrowth', 'Revenue Growth (YoY)', 100),
+                    ('currentRatio', 'Current Ratio', 1),
+                    ('earningsGrowth', 'Earnings Growth (YoY)', 100),
+                    ('priceToSales', 'P/S Ratio', 1),
+                    ('bookValue', 'Book Value Per Share', 1),
+                    ('ebitda', 'EBITDA', 1),
                 ]
                 for key, ratio_key, mult in ratio_map:
                     val = info.get(key)
                     if val is not None and ratio_key not in self.ratios:
                         try:
                             calculated = float(val) * mult
-                            # Apply sanity limits
                             if ratio_key in LIMITS:
                                 low, high = LIMITS[ratio_key]
                                 if calculated < low or calculated > high:
-                                    continue  # Skip unrealistic values
+                                    continue
                             self.ratios[ratio_key] = calculated
                         except (ValueError, TypeError):
                             pass
 
+            # ===== DIVIDEND YIELD: Calculate from cashflow (not yfinance) =====
+            if 'Dividend Yield' not in self.ratios:
+                try:
+                    if cashflow is not None and not cashflow.empty and cp and cp > 0:
+                        dividends_paid = self._safe_get(cashflow, [
+                            'Dividends Paid', 'Cash Dividends Paid', 'Common Stock Dividends'
+                        ])
+                        shares = self._safe_get(income, [
+                            'Diluted Average Shares', 'Basic Average Shares'
+                        ]) if income is not None else None
+                        
+                        if dividends_paid and shares and shares > 0:
+                            dps = abs(dividends_paid) / shares
+                            div_yield = (dps / cp) * 100
+                            if 0 <= div_yield <= 50:
+                                self.ratios['Dividend Yield'] = div_yield
+                except:
+                    pass
+            
+            # Fallback: yfinance dividend yield (only if reasonable)
+            if 'Dividend Yield' not in self.ratios:
+                yf_div = info.get('dividendYield') if isinstance(info, dict) else None
+                if yf_div is not None:
+                    try:
+                        div_yield = float(yf_div) * 100
+                        if 0 <= div_yield <= 50:
+                            self.ratios['Dividend Yield'] = div_yield
+                    except (ValueError, TypeError):
+                        pass
+
+            # ===== FROM FINANCIAL STATEMENTS =====
             if income is not None and not income.empty:
                 rev = self._safe_get(income, ['Total Revenue', 'Revenue'])
                 ni = self._safe_get(income, ['Net Income', 'Net Income Common Stockholders'])
                 gp = self._safe_get(income, ['Gross Profit'])
                 oi = self._safe_get(income, ['Operating Income', 'EBIT'])
+                ebitda = self._safe_get(income, ['EBITDA', 'Normalized EBITDA'])
                 rev_p = self._safe_get(income, ['Total Revenue', 'Revenue'], 1)
+                ni_p = self._safe_get(income, ['Net Income', 'Net Income Common Stockholders'], 1)
 
                 if rev and rev > 0:
                     if ni and 'Net Profit Margin' not in self.ratios:
@@ -380,21 +428,59 @@ class ProFinancialAnalyzer:
                         self.ratios['Gross Profit Margin'] = (gp / rev) * 100
                     if oi and 'Operating Margin' not in self.ratios:
                         self.ratios['Operating Margin'] = (oi / rev) * 100
+                    if ebitda and 'EBITDA Margin' not in self.ratios:
+                        self.ratios['EBITDA Margin'] = (ebitda / rev) * 100
                     if rev_p and rev_p > 0 and 'Revenue Growth (YoY)' not in self.ratios:
                         self.ratios['Revenue Growth (YoY)'] = ((rev - rev_p) / rev_p) * 100
+                    if ni_p and ni_p != 0 and 'Earnings Growth (YoY)' not in self.ratios:
+                        growth = ((ni - ni_p) / abs(ni_p)) * 100
+                        if -200 <= growth <= 500:
+                            self.ratios['Earnings Growth (YoY)'] = growth
+
+                # Per-share calculations
+                shares = self._safe_get(income, ['Diluted Average Shares', 'Basic Average Shares'])
+                if shares and shares > 0 and cp:
+                    if ni and 'EPS' not in self.ratios:
+                        self.ratios['EPS'] = ni / shares
+                    if rev and 'Revenue Per Share' not in self.ratios:
+                        rps = rev / shares
+                        self.ratios['Revenue Per Share'] = rps
+                        if rps > 0 and 'P/S Ratio' not in self.ratios:
+                            self.ratios['P/S Ratio'] = cp / rps
 
                 if balance is not None and not balance.empty:
                     eq = self._safe_get(balance, ['Stockholders Equity', 'Total Stockholder Equity', 'Total Equity'])
                     ast = self._safe_get(balance, ['Total Assets'])
                     ca = self._safe_get(balance, ['Current Assets'])
                     cl = self._safe_get(balance, ['Current Liabilities'])
+                    td = self._safe_get(balance, ['Total Debt', 'Long Term Debt'])
+                    inv = self._safe_get(balance, ['Inventory', 'Inventories'])
                     
-                    if eq and eq > 0 and ni and 'ROE' not in self.ratios:
-                        self.ratios['ROE'] = (ni / eq) * 100
-                    if ast and ast > 0 and ni and 'ROA' not in self.ratios:
-                        self.ratios['ROA'] = (ni / ast) * 100
-                    if ca and cl and cl > 0 and 'Current Ratio' not in self.ratios:
-                        self.ratios['Current Ratio'] = ca / cl
+                    if eq and eq > 0:
+                        if ni and 'ROE' not in self.ratios:
+                            self.ratios['ROE'] = (ni / eq) * 100
+                        if shares and shares > 0 and 'Book Value Per Share' not in self.ratios:
+                            self.ratios['Book Value Per Share'] = eq / shares
+                        if td and 'Debt to Equity' not in self.ratios:
+                            de = td / eq
+                            if 0 <= de <= 20:
+                                self.ratios['Debt to Equity'] = de
+                    
+                    if ast and ast > 0:
+                        if ni and 'ROA' not in self.ratios:
+                            self.ratios['ROA'] = (ni / ast) * 100
+                        if rev and 'Asset Turnover' not in self.ratios:
+                            self.ratios['Asset Turnover'] = rev / ast
+                        if oi and 'ROCE' not in self.ratios:
+                            roce = (oi / ast) * 100
+                            if -100 <= roce <= 100:
+                                self.ratios['ROCE'] = roce
+                    
+                    if ca and cl and cl > 0:
+                        if 'Current Ratio' not in self.ratios:
+                            self.ratios['Current Ratio'] = ca / cl
+                        if inv and 'Quick Ratio' not in self.ratios:
+                            self.ratios['Quick Ratio'] = (ca - inv) / cl
 
             self.ratios = {k: v for k, v in self.ratios.items() if v is not None}
             return True
