@@ -52,25 +52,37 @@ def create_advanced_scores_dashboard(analyzer):
         breakdown = f_score.get('breakdown', {})
         if breakdown and not f_score.get('error'):
             st.markdown("---")
-            st.markdown(f"**Overall: {breakdown.get('total', 'N/A')}**")
+            st.markdown(f"**Overall Score: {breakdown.get('total', 'N/A')}**")
             
-            prof = breakdown.get('profitability', {})
-            st.markdown(f"**Profitability** {prof.get('stars', '')} ({prof.get('score', 'N/A')})")
-            for item in prof.get('items', []):
-                icon = '✅' if item['status'] == 'pass' else '❌' if item['status'] == 'fail' else '⬜'
-                st.caption(f"{icon} {item['name']}: {item['detail']}")
-            
-            lev = breakdown.get('leverage', {})
-            st.markdown(f"**Leverage & Liquidity** {lev.get('stars', '')} ({lev.get('score', 'N/A')})")
-            for item in lev.get('items', []):
-                icon = '✅' if item['status'] == 'pass' else '❌' if item['status'] == 'fail' else '⬜'
-                st.caption(f"{icon} {item['name']}: {item['detail']}")
-            
-            eff = breakdown.get('efficiency', {})
-            st.markdown(f"**Operating Efficiency** {eff.get('stars', '')} ({eff.get('score', 'N/A')})")
-            for item in eff.get('items', []):
-                icon = '✅' if item['status'] == 'pass' else '❌' if item['status'] == 'fail' else '⬜'
-                st.caption(f"{icon} {item['name']}: {item['detail']}")
+            # ===== ALL 9 FACTORS SCORECARD =====
+            with st.expander("📋 Full Scorecard (9 Factors)", expanded=True):
+                for category_name, category_key in [
+                    ('💰 Profitability', 'profitability'),
+                    ('🏦 Leverage & Liquidity', 'leverage'),
+                    ('⚙️ Operating Efficiency', 'efficiency')
+                ]:
+                    cat = breakdown.get(category_key, {})
+                    st.markdown(f"**{category_name}** {cat.get('stars', '')} ({cat.get('score', 'N/A')})")
+                    
+                    for item in cat.get('items', []):
+                        status = item['status']
+                        if status == 'pass':
+                            icon = '✅'
+                            color = '#10b981'
+                        elif status == 'fail':
+                            icon = '❌'
+                            color = '#ef4444'
+                        else:
+                            icon = '⬜'
+                            color = '#94a3b8'
+                        
+                        st.markdown(
+                            f"<span style='color:{color};font-size:1.1rem;'>{icon}</span> "
+                            f"<span style='color:#e2e8f0;'>{item['name']}</span> "
+                            f"<span style='color:#94a3b8;font-size:0.8rem;'>— {item['detail']}</span>",
+                            unsafe_allow_html=True
+                        )
+                    st.markdown("")
         else:
             with st.expander("📋 Details"):
                 for d in f_score.get('details', []):
@@ -133,7 +145,6 @@ def create_advanced_scores_dashboard(analyzer):
         else:
             st.warning("Insufficient data for Z-Score calculation.")
             
-            # Show what's missing
             st.markdown("**Possible reasons:**")
             if not market_cap or market_cap <= 0:
                 st.caption("❌ Market Cap not available")
@@ -142,7 +153,7 @@ def create_advanced_scores_dashboard(analyzer):
             else:
                 col = balance.columns[0] if not balance.empty else None
                 if col:
-                    ta = next((balance.loc[k, col] for k in ['Total Assets'] if k in balance.index), 0)
+                    ta = next((balance.loc[k, col] for k in ['Total Assets', 'Total Assets, Total'] if k in balance.index), 0)
                     if not ta or ta <= 0 or pd.isna(ta):
                         st.caption("❌ Total Assets = 0 or missing")
             if income is None or income.empty:
