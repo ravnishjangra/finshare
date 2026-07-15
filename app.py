@@ -1,4 +1,5 @@
 """Finshare Pro - Enterprise Financial Analysis Platform"""
+from dashboards.financial_models import create_financial_models_dashboard
 import streamlit as st
 from datetime import datetime
 from config import *
@@ -171,13 +172,14 @@ def main():
                         create_index_comparison_dashboard(analyzer)
                         create_investment_thesis_dashboard(analyzer)
                         create_factor_investing_dashboard(analyzer)
+                        create_financial_models_dashboard(analyzer)
 
                         group_name, peer_list = detect_peer_group(analyzer.ticker)
                         if peer_list:
                             with st.spinner("Fetching peers..."):
                                 all_peers = [analyzer.ticker] + [p for p in peer_list if p != analyzer.ticker][:5]
                                 pdf = get_peer_comparison(analyzer.ticker, all_peers)
-                                if not pdf.empty:
+                                if pdf is not None and not pdf.empty:
                                     st.markdown('<div class="section-header">🏢 Peer Comparison</div>', unsafe_allow_html=True)
                                     st.dataframe(pdf, use_container_width=True, hide_index=True)
 
