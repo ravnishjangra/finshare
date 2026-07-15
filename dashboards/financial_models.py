@@ -1,4 +1,5 @@
-"""Financial Models Dashboard - Performance, Beneish, DuPont, Composite"""
+"""Financial Models Dashboard - Performance, Beneish, DuPont, Composite, Ohlson"""
+from models.fear_greed import FearGreedIndex
 import streamlit as st
 import plotly.graph_objects as go
 from models.beneish import BeneishMScore
@@ -7,6 +8,7 @@ from models.performance_ratios import PerformanceRatios
 from models.composite_score import CompositeScore
 from models.piotroski import PiotroskiFScore
 from models.altman import AltmanZScore
+from models.ohlson import OhlsonOScore
 
 def create_financial_models_dashboard(analyzer):
     st.markdown('<div class="section-header">📊 Advanced Financial Models</div>', unsafe_allow_html=True)
@@ -58,11 +60,47 @@ def create_financial_models_dashboard(analyzer):
             c2.metric("VaR 99%", f"{perf['var_99']}%", delta_color="inverse")
             c3.metric("CVaR 95%", f"{perf['cvar_95']}%", delta_color="inverse")
             c4.metric("Win/Loss Ratio", f"{perf['win_loss_ratio']}")
+            
+                # ===== FEAR & GREED INDEX =====
+    st.markdown("### 😱 Fear & Greed Index")
+    
+    fg = FearGreedIndex.calculate(prices, info)
+    if fg:
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=fg['score'],
+                number={'font': {'color': fg['color'], 'size': 48}},
+                title={'text': "Fear & Greed"},
+                gauge={
+                    'axis': {'range': [0, 100], 'tickcolor': '#94a3b8'},
+                    'bar': {'color': fg['color']},
+                    'steps': [
+                        {'range': [0, 25], 'color': "rgba(239,68,68,0.3)", 'name': 'Extreme Fear'},
+                        {'range': [25, 45], 'color': "rgba(245,158,11,0.3)", 'name': 'Fear'},
+                        {'range': [45, 55], 'color': "rgba(148,163,184,0.3)", 'name': 'Neutral'},
+                        {'range': [55, 75], 'color': "rgba(52,211,153,0.3)", 'name': 'Greed'},
+                        {'range': [75, 100], 'color': "rgba(16,185,129,0.3)", 'name': 'Extreme Greed'},
+                    ],
+                    'threshold': {'line': {'color': 'white', 'width': 3}, 'value': fg['score']}
+                }
+            ))
+            fig.update_layout(height=250)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown(f"<h3 style='text-align:center;color:{fg['color']};'>{fg['sentiment']}</h3>", unsafe_allow_html=True)
+            st.caption(f"💡 {fg['advice']}")
+        
+        with col2:
+            for factor, score in fg['factors'].items():
+                bar = '█' * int(score) + '░' * (25 - int(score))
+                factor_color = '#10b981' if score > 15 else '#f59e0b' if score > 8 else '#ef4444'
+                st.markdown(f"**{factor}**: <span style='color:{factor_color}'>{bar}</span> {score}/25", unsafe_allow_html=True)
     
     # ===== SECTION 2: EARNINGS QUALITY =====
     st.markdown("### 🔍 Earnings Quality & Fraud Detection")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown("**Beneish M-Score**")
@@ -93,6 +131,20 @@ def create_financial_models_dashboard(analyzer):
             st.markdown(f"<h2 style='color:{z_score.get('color','#94a3b8')};text-align:center;'>{z_score['z_score']:.2f}</h2>", unsafe_allow_html=True)
             st.markdown(f"<p style='text-align:center;color:{z_score.get('color','#94a3b8')};'><b>{z_score['zone']}</b></p>", unsafe_allow_html=True)
             st.caption(f"Probability: {z_score.get('probability','N/A')}")
+        else:
+            st.warning("Insufficient data")
+    
+    with col4:
+        st.markdown("**Ohlson O-Score**")
+        st.caption("Bankruptcy probability (1980)")
+        o_score = OhlsonOScore.calculate(income, balance, info)
+        if o_score:
+            st.markdown(f"<h2 style='color:{o_score['color']};text-align:center;'>{o_score['probability']}</h2>", unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align:center;color:{o_score['color']};'><b>{o_score['risk']}</b></p>", unsafe_allow_html=True)
+            st.caption(o_score['interpretation'])
+            with st.expander("📋 Components"):
+                for k, v in o_score['components'].items():
+                    st.caption(f"• {k}: {v}")
         else:
             st.warning("Insufficient data")
     
