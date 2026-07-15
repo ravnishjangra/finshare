@@ -1,7 +1,6 @@
 """Valuation Dashboard"""
 import streamlit as st
 import plotly.graph_objects as go
-import numpy as np
 from models.dcf import AdvancedDCF
 from models.graham import GrahamValuation
 from models.epv import EarningsPowerValue
@@ -17,10 +16,35 @@ def create_valuation_dashboard(analyzer):
         st.warning("Current price not available.")
         return
     
-    rev = analyzer._safe_get(income, ['Total Revenue', 'Revenue']) or 0
-    ni = analyzer._safe_get(income, ['Net Income', 'Net Income Common Stockholders']) or 0
-    fcf = analyzer._safe_get(cashflow, ['Free Cash Flow']) or (ni * 0.8 if ni else (rev * 0.1 if rev else 1e6))
-    shares = analyzer._safe_get(income, ['Diluted Average Shares']) or analyzer._safe_get(income, ['Basic Average Shares']) or (analyzer.live_price_data.get('market_cap', 1e9) / cp if cp > 0 else 1e6)
+    rev = analyzer._safe_get(income, ['Total Revenue', 'Revenue']) if income is not None else 0
+    ni = analyzer._safe_get(income, ['Net Income', 'Net Income Common Stockholders']) if income is not None else 0
+    fcf = analyzer._safe_get(cashflow, ['Free Cash Flow']) if cashflow is not None else None
+    
+    # Safe FCF calculation
+    if not fcf:
+        if ni and ni > 0:
+            fcf = ni * 0.8
+        elif rev and rev > 0:
+            fcf = rev * 0.1
+        else:
+            fcf = cp * 1000000  # Fallback: assume 1M shares at current price
+    
+    # Safe shares calculation
+    shares = None
+    if income is not None:
+        shares = analyzer._safe_get(income, ['Diluted Average Shares']) or analyzer._safe_get(income, ['Basic Average Shares'])
+    
+    if not shares:
+        mcap = analyzer.live_price_data.get('market_cap')
+        if mcap and mcap > 0 and cp > 0:
+            shares = mcap / cp
+        else:
+            shares = 1e6  # Default 1 million shares
+    
+    # Ensure shares is a valid number
+    if not shares or shares <= 0:
+        shares = 1e6
+    
     beta = analyzer.live_price_data.get('beta', 1.0) or 1.0
     rg = max(0.02, min((analyzer.ratios.get('Revenue Growth (YoY)', 10) or 10) / 100, 0.35))
     om = (analyzer.ratios.get('Operating Margin', 15) or 15) / 100
@@ -42,6 +66,10 @@ def create_valuation_dashboard(analyzer):
     dcf = AdvancedDCF(dcf_fcf, dcf_shares, cp, dcf_growth, dcf_beta, dcf_rf, dcf_mr)
     result = dcf.calculate()
     
+    if result['intrinsic_value'] > cp * 1000 or result['intrinsic_value'] < cp * 0.001:
+        st.warning("⚠️ DCF values seem extreme. This may be due to limited financial data. Adjust parameters or try a different ticker.")
+        return
+    
     st.markdown(f'<div style="background-color:{result["rec_color"]};padding:1.5rem;border-radius:16px;color:white;text-align:center;margin:1rem 0;"><h2>{result["recommendation"]}</h2><p>Intrinsic Value: {cur}{result["intrinsic_value"]:.2f} | Upside: {result["upside"]:+.1f}%</p></div>', unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
@@ -61,15 +89,16 @@ def create_valuation_dashboard(analyzer):
     st.plotly_chart(fig, use_container_width=True)
 
     eps = analyzer.ratios.get('EPS', ni/shares if ni and shares else 1)
-    graham_val = GrahamValuation.calculate(eps, rg, rf)
-    epv = EarningsPowerValue.calculate(rev or 0, om, 0.25, result['wacc'], shares)
+    graham_val = GrahamValuation.calculate(eps, rg, rf) if eps and eps > 0 else 0
+    epv = EarningsPowerValue.calculate(rev or 0, om, 0.25, result['wacc'], shares) if rev and rev > 0 else 0
 
     st.markdown("### 📊 Valuation Model Comparison")
     models = {'Advanced DCF': result['intrinsic_value'], 'Graham': graham_val, 'EPV': epv, 'Current Price': cp}
     fig = go.Figure()
     for model, val in models.items():
-        color = '#10b981' if val > cp else '#ef4444' if val < cp else '#f59e0b'
-        fig.add_trace(go.Bar(x=[model], y=[val], marker_color=color, text=[f"{cur}{val:.2f}"], textposition='outside'))
+        if val and val > 0:
+            color = '#10b981' if val > cp else '#ef4444' if val < cp else '#f59e0b'
+            fig.add_trace(go.Bar(x=[model], y=[val], marker_color=color, text=[f"{cur}{val:.2f}"], textposition='outside'))
     fig.add_hline(y=cp, line_dash="dash", line_color="#94a3b8")
     fig.update_layout(title='All Valuation Models', template='plotly_white', height=400, showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
