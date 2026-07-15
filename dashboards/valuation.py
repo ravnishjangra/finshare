@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from models.dcf import AdvancedDCF
 from models.graham import GrahamValuation
 from models.epv import EarningsPowerValue
+from models.residual_income import ResidualIncome
 
 def create_valuation_dashboard(analyzer):
     st.markdown('<div class="section-header">💰 Advanced Valuation Models</div>', unsafe_allow_html=True)
@@ -20,16 +21,14 @@ def create_valuation_dashboard(analyzer):
     ni = analyzer._safe_get(income, ['Net Income', 'Net Income Common Stockholders']) if income is not None else 0
     fcf = analyzer._safe_get(cashflow, ['Free Cash Flow']) if cashflow is not None else None
     
-    # Safe FCF calculation
     if not fcf:
         if ni and ni > 0:
             fcf = ni * 0.8
         elif rev and rev > 0:
             fcf = rev * 0.1
         else:
-            fcf = cp * 1000000  # Fallback: assume 1M shares at current price
+            fcf = cp * 1000000
     
-    # Safe shares calculation
     shares = None
     if income is not None:
         shares = analyzer._safe_get(income, ['Diluted Average Shares']) or analyzer._safe_get(income, ['Basic Average Shares'])
@@ -39,9 +38,8 @@ def create_valuation_dashboard(analyzer):
         if mcap and mcap > 0 and cp > 0:
             shares = mcap / cp
         else:
-            shares = 1e6  # Default 1 million shares
+            shares = 1e6
     
-    # Ensure shares is a valid number
     if not shares or shares <= 0:
         shares = 1e6
     
@@ -102,3 +100,16 @@ def create_valuation_dashboard(analyzer):
     fig.add_hline(y=cp, line_dash="dash", line_color="#94a3b8")
     fig.update_layout(title='All Valuation Models', template='plotly_white', height=400, showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
+
+    # ===== RESIDUAL INCOME VALUATION =====
+    st.markdown("### 📊 Residual Income Valuation")
+    ri = ResidualIncome.calculate(income, analyzer.financials.get('balance'), 
+                                   analyzer.financials.get('info', {}), cp,
+                                   risk_free_rate=0.072 if analyzer.currency == 'INR' else 0.045,
+                                   market_return=0.12 if analyzer.currency == 'INR' else 0.10)
+    if ri:
+        col1, col2, col3 = st.columns(3)
+        with col1: st.metric("Intrinsic Value", f"{cur}{ri['intrinsic_value']:.2f}")
+        with col2: st.metric("Book Value/Share", f"{cur}{ri['book_value_ps']:.2f}")
+        with col3: st.metric("Residual Income", f"{cur}{ri['residual_income']:.2f}")
+        st.caption(f"Cost of Equity: {ri['cost_of_equity']}% | Growth: {ri['growth_rate']}% | {ri['recommendation']}")

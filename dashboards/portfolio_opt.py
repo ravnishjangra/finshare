@@ -1,4 +1,4 @@
-"""Portfolio Optimization Tab - 5 Strategy Comparison"""
+"""Portfolio Optimization Tab - 6 Strategy Comparison"""
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -6,10 +6,11 @@ import numpy as np
 import yfinance as yf
 from scipy.optimize import minimize
 from analytics.portfolio import PortfolioOptimizer
+from models.max_diversification import MaxDiversification
 
 def create_portfolio_optimization_tab():
     st.markdown('<div class="section-header">🎯 Portfolio Strategy Comparison</div>', unsafe_allow_html=True)
-    st.caption("Compare 5 portfolio construction strategies side-by-side")
+    st.caption("Compare 6 portfolio construction strategies side-by-side")
     
     presets = {
         "🔧 Custom": [],
@@ -42,7 +43,7 @@ def create_portfolio_optimization_tab():
             st.error("Need at least 2 tickers."); return
         
         opt = PortfolioOptimizer(tickers, period=period, risk_free_rate=risk_free)
-        with st.spinner(f"Optimizing {len(tickers)} assets across 5 strategies..."):
+        with st.spinner(f"Optimizing {len(tickers)} assets across 6 strategies..."):
             if not opt.download_data() or not opt.calculate_returns():
                 st.error("Could not fetch data. Check tickers."); return
             
@@ -86,10 +87,14 @@ def create_portfolio_optimization_tab():
                 except: market_caps[t] = 1e9
             total_mcap = sum(market_caps.values())
             mkt_w = np.array([market_caps[t]/total_mcap for t in tickers])
-            pi = 2.5 * cov @ mkt_w  # equilibrium returns
+            pi = 2.5 * cov @ mkt_w
             w5 = np.linalg.inv(cov) @ pi
             w5 = np.maximum(w5, 0)
             w5 = w5 / w5.sum()
+            
+            # ===== 6. MAX DIVERSIFICATION =====
+            md = MaxDiversification.calculate(opt.mean_returns, opt.cov_matrix)
+            w6 = md['weights']
             
             strategies = [
                 {'name': 'Equal Weight', 'weights': dict(zip(tickers, w1)), 'return': port_return(w1), 'volatility': port_vol(w1), 'sharpe': port_sharpe(w1), 'color': '#94a3b8'},
@@ -97,11 +102,12 @@ def create_portfolio_optimization_tab():
                 {'name': 'Min Volatility', 'weights': dict(zip(tickers, w3)), 'return': port_return(w3), 'volatility': port_vol(w3), 'sharpe': port_sharpe(w3), 'color': '#f59e0b'},
                 {'name': 'Risk Parity', 'weights': dict(zip(tickers, w4)), 'return': port_return(w4), 'volatility': port_vol(w4), 'sharpe': port_sharpe(w4), 'color': '#10b981'},
                 {'name': 'Black-Litterman', 'weights': dict(zip(tickers, w5)), 'return': port_return(w5), 'volatility': port_vol(w5), 'sharpe': port_sharpe(w5), 'color': '#f093fb'},
+                {'name': 'Max Diversification', 'weights': dict(zip(tickers, w6.round(4))), 'return': port_return(w6), 'volatility': port_vol(w6), 'sharpe': port_sharpe(w6), 'color': '#8b5cf6'},
             ]
         
         # ===== PIE CHARTS =====
         st.markdown("### 📊 Portfolio Weights by Strategy")
-        cols = st.columns(5)
+        cols = st.columns(6)
         for col, strat in zip(cols, strategies):
             with col:
                 st.markdown(f"**{strat['name']}**")
