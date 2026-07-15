@@ -84,14 +84,4 @@ def get_peer_comparison(main_ticker, peer_tickers):
         except:
             continue
     
-    df = pd.DataFrame(data)
-    
-    # Highlight the main ticker
-    if not df.empty:
-        def highlight_main(row):
-            if row['Ticker'] == main_ticker.replace('.NS', '').replace('.BO', ''):
-                return ['background-color: rgba(102,126,234,0.2)'] * len(row)
-            return [''] * len(row)
-        df = df.style.apply(highlight_main, axis=1)
-    
-    return df
+    return pd.DataFrame(data)
