@@ -5,7 +5,7 @@ from models.piotroski import PiotroskiFScore
 from models.altman import AltmanZScore
 
 def create_advanced_scores_dashboard(analyzer):
-    st.markdown('<div class="section-header">🔬 Advanced Financial Scores</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">🔬 Financial Strength Scores</div>', unsafe_allow_html=True)
     income = analyzer.financials.get('income')
     balance = analyzer.financials.get('balance')
     cashflow = analyzer.financials.get('cashflow')
@@ -17,35 +17,134 @@ def create_advanced_scores_dashboard(analyzer):
     
     col1, col2 = st.columns(2)
     
+    # ===== PIOTROSKI F-SCORE =====
     with col1:
         st.markdown("### 📊 Piotroski F-Score")
+        st.caption("Financial strength indicator (0-9)")
         f_score = PiotroskiFScore.calculate(income, balance, cashflow)
-        score_color = "#10b981" if f_score['score'] >= 7 else "#f59e0b" if f_score['score'] >= 4 else "#ef4444"
         
-        fig = go.Figure(go.Indicator(mode="gauge+number", value=f_score['score'], title={'text':"F-Score"},
-                        gauge={'axis':{'range':[0,9]},'bar':{'color':score_color},
-                               'steps':[{'range':[0,3],'color':"rgba(239,68,68,0.2)"},
-                                        {'range':[3,6],'color':"rgba(245,158,11,0.2)"},
-                                        {'range':[6,9],'color':"rgba(16,185,129,0.2)"}]}))
-        fig.update_layout(height=250, margin=dict(t=30,b=0))
+        score = f_score.get('score', 0)
+        score_color = f_score.get('color', '#94a3b8')
+        rating = f_score.get('rating', 'N/A')
+        
+        # Gauge chart
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=score,
+            number={'font': {'color': score_color, 'size': 48}},
+            title={'text': "Piotroski F-Score", 'font': {'size': 14}},
+            gauge={
+                'axis': {'range': [0, 9], 'tickwidth': 1},
+                'bar': {'color': score_color, 'thickness': 0.2},
+                'steps': [
+                    {'range': [0, 3], 'color': "rgba(239,68,68,0.15)"},
+                    {'range': [3, 6], 'color': "rgba(245,158,11,0.15)"},
+                    {'range': [6, 9], 'color': "rgba(16,185,129,0.15)"}
+                ],
+                'threshold': {
+                    'line': {'color': score_color, 'width': 3},
+                    'thickness': 0.8,
+                    'value': score
+                }
+            }
+        ))
+        fig.update_layout(height=220, margin=dict(t=30, b=0, l=20, r=20))
         st.plotly_chart(fig, use_container_width=True)
-        st.markdown(f"**{f_score['rating']}**")
-        with st.expander(f"Details ({f_score['score']}/9)"):
-            for d in f_score['details']: st.write(d)
+        
+        st.markdown(f"<h3 style='text-align:center; color:{score_color};'>{rating}</h3>", unsafe_allow_html=True)
+        
+        # Breakdown
+        breakdown = f_score.get('breakdown', {})
+        if breakdown and not f_score.get('error'):
+            st.markdown("---")
+            st.markdown(f"**Overall: {breakdown.get('total', 'N/A')}**")
+            
+            # Profitability
+            prof = breakdown.get('profitability', {})
+            st.markdown(f"**Profitability** {prof.get('stars', '')} ({prof.get('score', 'N/A')})")
+            for item in prof.get('items', []):
+                icon = '✅' if item['status'] == 'pass' else '❌' if item['status'] == 'fail' else '⬜'
+                st.caption(f"{icon} {item['name']}: {item['detail']}")
+            
+            # Leverage & Liquidity
+            lev = breakdown.get('leverage', {})
+            st.markdown(f"**Leverage & Liquidity** {lev.get('stars', '')} ({lev.get('score', 'N/A')})")
+            for item in lev.get('items', []):
+                icon = '✅' if item['status'] == 'pass' else '❌' if item['status'] == 'fail' else '⬜'
+                st.caption(f"{icon} {item['name']}: {item['detail']}")
+            
+            # Operating Efficiency
+            eff = breakdown.get('efficiency', {})
+            st.markdown(f"**Operating Efficiency** {eff.get('stars', '')} ({eff.get('score', 'N/A')})")
+            for item in eff.get('items', []):
+                icon = '✅' if item['status'] == 'pass' else '❌' if item['status'] == 'fail' else '⬜'
+                st.caption(f"{icon} {item['name']}: {item['detail']}")
+        else:
+            with st.expander("📋 Details"):
+                for d in f_score.get('details', []):
+                    st.write(d)
     
+    # ===== ALTMAN Z-SCORE =====
     with col2:
         st.markdown("### 🏦 Altman Z-Score")
+        st.caption("Bankruptcy prediction model")
         z_result = AltmanZScore.calculate(balance, income, market_cap)
+        
         if z_result:
             z = z_result['z_score']
-            z_color = "#10b981" if z > 2.99 else "#f59e0b" if z > 1.81 else "#ef4444"
-            fig = go.Figure(go.Indicator(mode="gauge+number", value=z, title={'text':"Z-Score"},
-                            gauge={'axis':{'range':[0,6]},'bar':{'color':z_color},
-                                   'steps':[{'range':[0,1.81],'color':"rgba(239,68,68,0.2)"},
-                                            {'range':[1.81,2.99],'color':"rgba(245,158,11,0.2)"},
-                                            {'range':[2.99,6],'color':"rgba(16,185,129,0.2)"}]}))
-            fig.update_layout(height=250, margin=dict(t=30,b=0))
+            z_color = z_result.get('color', '#94a3b8')
+            zone = z_result.get('zone', 'N/A')
+            risk = z_result.get('risk_level', 'N/A')
+            prob = z_result.get('probability', 'N/A')
+            interpretation = z_result.get('interpretation', '')
+            
+            # Gauge chart
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=z,
+                number={'font': {'color': z_color, 'size': 48}},
+                title={'text': "Altman Z-Score", 'font': {'size': 14}},
+                gauge={
+                    'axis': {'range': [0, 6], 'tickwidth': 1},
+                    'bar': {'color': z_color, 'thickness': 0.2},
+                    'steps': [
+                        {'range': [0, 1.81], 'color': "rgba(239,68,68,0.15)"},
+                        {'range': [1.81, 2.99], 'color': "rgba(245,158,11,0.15)"},
+                        {'range': [2.99, 6], 'color': "rgba(16,185,129,0.15)"}
+                    ],
+                    'threshold': {
+                        'line': {'color': z_color, 'width': 3},
+                        'thickness': 0.8,
+                        'value': z
+                    }
+                }
+            ))
+            fig.update_layout(height=220, margin=dict(t=30, b=0, l=20, r=20))
             st.plotly_chart(fig, use_container_width=True)
-            st.markdown(f"**{z_result['zone']}** - {z_result['risk']}")
+            
+            st.markdown(f"<h3 style='text-align:center; color:{z_color};'>{zone}</h3>", unsafe_allow_html=True)
+            
+            # Risk summary
+            st.markdown("---")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.metric("Z-Score", f"{z:.2f}")
+                st.metric("Probability of Distress", prob)
+            with col_b:
+                st.metric("Risk Level", risk)
+            
+            st.markdown(f"**Interpretation:** {interpretation}")
+            
+            # Component breakdown
+            components = z_result.get('components', {})
+            if components:
+                with st.expander("🔍 Component Breakdown"):
+                    for comp_name, comp_data in components.items():
+                        val = comp_data['value']
+                        weight = comp_data['weight']
+                        signal = comp_data['signal']
+                        color = '#10b981' if val > 0 else '#ef4444'
+                        st.markdown(f"**{comp_name}** = {val:.3f} × {weight} → *{signal}*")
         else:
-            st.warning("Insufficient data for Z-Score")
+            st.warning("Insufficient data for Z-Score calculation.")
+            st.caption("Z-Score requires Total Assets, Current Assets/Liabilities, EBIT, and Revenue data.")
