@@ -1,5 +1,4 @@
-"""Financial Models Dashboard - Performance, Beneish, DuPont, Composite, Ohlson"""
-from models.fear_greed import FearGreedIndex
+"""Financial Models Dashboard - Performance, Beneish, DuPont, Composite, Ohlson, Fear & Greed"""
 import streamlit as st
 import plotly.graph_objects as go
 from models.beneish import BeneishMScore
@@ -9,6 +8,7 @@ from models.composite_score import CompositeScore
 from models.piotroski import PiotroskiFScore
 from models.altman import AltmanZScore
 from models.ohlson import OhlsonOScore
+from models.fear_greed import FearGreedIndex
 
 def create_financial_models_dashboard(analyzer):
     st.markdown('<div class="section-header">📊 Advanced Financial Models</div>', unsafe_allow_html=True)
@@ -25,43 +25,7 @@ def create_financial_models_dashboard(analyzer):
         st.warning("Financial statements not available for advanced models.")
         return
     
-    # ===== SECTION 1: PERFORMANCE METRICS =====
-    st.markdown("### 📈 Performance Metrics")
-    
-    risk_free = 0.06 if analyzer.currency == 'USD' else 0.07
-    perf = PerformanceRatios.calculate(prices, info, risk_free_rate=risk_free)
-    
-    if perf:
-        cols = st.columns(5)
-        for col, (label, val) in zip(cols, [
-            ('Annual Return', f"{perf['annual_return']}%"),
-            ('Volatility', f"{perf['annual_volatility']}%"),
-            ('Sharpe Ratio', f"{perf['sharpe_ratio']}"),
-            ('Sortino Ratio', f"{perf['sortino_ratio']}"),
-            ('Max Drawdown', f"{perf['max_drawdown']}%"),
-        ]):
-            with col:
-                st.metric(label, val)
-        
-        cols = st.columns(5)
-        for col, (label, val) in zip(cols, [
-            ("Jensen's Alpha", f"{perf['jensens_alpha']}%"),
-            ('Beta', f"{perf['beta']}"),
-            ('Treynor Ratio', f"{perf['treynor_ratio']}"),
-            ('Info Ratio', f"{perf['information_ratio']}"),
-            ('Calmar Ratio', f"{perf['calmar_ratio']}"),
-        ]):
-            with col:
-                st.metric(label, val)
-        
-        with st.expander("🔍 Risk Metrics (VaR & CVaR)"):
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("VaR 95%", f"{perf['var_95']}%", delta_color="inverse")
-            c2.metric("VaR 99%", f"{perf['var_99']}%", delta_color="inverse")
-            c3.metric("CVaR 95%", f"{perf['cvar_95']}%", delta_color="inverse")
-            c4.metric("Win/Loss Ratio", f"{perf['win_loss_ratio']}")
-            
-                # ===== FEAR & GREED INDEX =====
+    # ===== SECTION 1: FEAR & GREED INDEX =====
     st.markdown("### 😱 Fear & Greed Index")
     
     fg = FearGreedIndex.calculate(prices, info)
@@ -77,11 +41,11 @@ def create_financial_models_dashboard(analyzer):
                     'axis': {'range': [0, 100], 'tickcolor': '#94a3b8'},
                     'bar': {'color': fg['color']},
                     'steps': [
-                        {'range': [0, 25], 'color': "rgba(239,68,68,0.3)", 'name': 'Extreme Fear'},
-                        {'range': [25, 45], 'color': "rgba(245,158,11,0.3)", 'name': 'Fear'},
-                        {'range': [45, 55], 'color': "rgba(148,163,184,0.3)", 'name': 'Neutral'},
-                        {'range': [55, 75], 'color': "rgba(52,211,153,0.3)", 'name': 'Greed'},
-                        {'range': [75, 100], 'color': "rgba(16,185,129,0.3)", 'name': 'Extreme Greed'},
+                        {'range': [0, 25], 'color': "rgba(239,68,68,0.3)"},
+                        {'range': [25, 45], 'color': "rgba(245,158,11,0.3)"},
+                        {'range': [45, 55], 'color': "rgba(148,163,184,0.3)"},
+                        {'range': [55, 75], 'color': "rgba(52,211,153,0.3)"},
+                        {'range': [75, 100], 'color': "rgba(16,185,129,0.3)"},
                     ],
                     'threshold': {'line': {'color': 'white', 'width': 3}, 'value': fg['score']}
                 }
@@ -97,7 +61,41 @@ def create_financial_models_dashboard(analyzer):
                 factor_color = '#10b981' if score > 15 else '#f59e0b' if score > 8 else '#ef4444'
                 st.markdown(f"**{factor}**: <span style='color:{factor_color}'>{bar}</span> {score}/25", unsafe_allow_html=True)
     
-    # ===== SECTION 2: EARNINGS QUALITY =====
+    # ===== SECTION 2: PERFORMANCE METRICS =====
+    st.markdown("### 📈 Performance Metrics")
+    
+    risk_free = 0.06 if analyzer.currency == 'USD' else 0.07
+    perf = PerformanceRatios.calculate(prices, info, risk_free_rate=risk_free)
+    
+    if perf:
+        cols = st.columns(5)
+        for col, (label, val) in zip(cols, [
+            ('Annual Return', f"{perf['annual_return']}%"),
+            ('Volatility', f"{perf['annual_volatility']}%"),
+            ('Sharpe Ratio', f"{perf['sharpe_ratio']}"),
+            ('Sortino Ratio', f"{perf['sortino_ratio']}"),
+            ('Max Drawdown', f"{perf['max_drawdown']}%"),
+        ]):
+            with col: st.metric(label, val)
+        
+        cols = st.columns(5)
+        for col, (label, val) in zip(cols, [
+            ("Jensen's Alpha", f"{perf['jensens_alpha']}%"),
+            ('Beta', f"{perf['beta']}"),
+            ('Treynor Ratio', f"{perf['treynor_ratio']}"),
+            ('Info Ratio', f"{perf['information_ratio']}"),
+            ('Calmar Ratio', f"{perf['calmar_ratio']}"),
+        ]):
+            with col: st.metric(label, val)
+        
+        with st.expander("🔍 Risk Metrics (VaR & CVaR)"):
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("VaR 95%", f"{perf['var_95']}%", delta_color="inverse")
+            c2.metric("VaR 99%", f"{perf['var_99']}%", delta_color="inverse")
+            c3.metric("CVaR 95%", f"{perf['cvar_95']}%", delta_color="inverse")
+            c4.metric("Win/Loss Ratio", f"{perf['win_loss_ratio']}")
+    
+    # ===== SECTION 3: EARNINGS QUALITY =====
     st.markdown("### 🔍 Earnings Quality & Fraud Detection")
     
     col1, col2, col3, col4 = st.columns(4)
@@ -148,7 +146,7 @@ def create_financial_models_dashboard(analyzer):
         else:
             st.warning("Insufficient data")
     
-    # ===== SECTION 3: DUPONT ANALYSIS =====
+    # ===== SECTION 4: DUPONT ANALYSIS =====
     st.markdown("### 🧩 DuPont ROE Decomposition")
     
     dupont = DuPontAnalysis.calculate(income, balance, ratios)
@@ -203,7 +201,7 @@ def create_financial_models_dashboard(analyzer):
     else:
         st.warning("Insufficient data for DuPont analysis")
     
-    # ===== SECTION 4: COMPOSITE HEALTH SCORE =====
+    # ===== SECTION 5: COMPOSITE HEALTH SCORE =====
     st.markdown("### 🏆 Composite Financial Health Score")
     
     composite = CompositeScore.calculate(ratios, f_score, z_score)
