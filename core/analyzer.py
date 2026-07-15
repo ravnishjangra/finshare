@@ -90,9 +90,37 @@ class ProFinancialAnalyzer:
                 'sharesOutstanding': stats.get('sharesOutstanding', {}).get('raw') or q.get('sharesOutstanding'),
             }
             
-            if not info['marketCap'] and info['sharesOutstanding'] and current_price:
+            # ===== SMART FALLBACK: Only fetch missing critical data from yfinance =====
+            missing_mcap = not info.get('marketCap')
+            missing_ratios = not info.get('trailingPE') and not info.get('returnOnEquity')
+            
+            if missing_mcap or missing_ratios:
+                try:
+                    stock = _get_cached_ticker(self.ticker)
+                    yf_info = stock.info
+                    
+                    if yf_info and isinstance(yf_info, dict):
+                        # Only fill in what's missing
+                        if missing_mcap:
+                            if yf_info.get('marketCap'):
+                                info['marketCap'] = yf_info['marketCap']
+                            elif yf_info.get('sharesOutstanding') and current_price:
+                                info['marketCap'] = yf_info['sharesOutstanding'] * current_price
+                        
+                        if missing_ratios:
+                            for key in ['trailingPE', 'returnOnEquity', 'debtToEquity',
+                                         'profitMargins', 'revenueGrowth', 'dividendYield',
+                                         'beta', 'returnOnAssets', 'priceToBook', 'trailingEps']:
+                                if not info.get(key) and yf_info.get(key):
+                                    info[key] = yf_info[key]
+                except:
+                    pass
+            
+            # Calculate market cap from shares if still missing
+            if not info.get('marketCap') and info.get('sharesOutstanding') and current_price:
                 info['marketCap'] = info['sharesOutstanding'] * current_price
             
+            # Clean None values
             info = {k: v for k, v in info.items() if v is not None}
             return True, info
             
