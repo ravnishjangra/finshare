@@ -52,13 +52,29 @@ class ProFinancialAnalyzer:
             stats = modules.get('defaultKeyStatistics', {}).get(self.ticker, {})
             fin_data = modules.get('financialData', {}).get(self.ticker, {})
             
+            # ===== FIX: Handle empty dicts from yahooquery =====
+            if not isinstance(price_data, dict) or len(price_data) == 0:
+                price_data = {}
+            if not isinstance(summary, dict):
+                summary = {}
+            if not isinstance(stats, dict):
+                stats = {}
+            if not isinstance(fin_data, dict):
+                fin_data = {}
+            
             quote = t.quotes
             q = quote[0] if quote and len(quote) > 0 else {}
+            if not isinstance(q, dict):
+                q = {}
             
-            current_price = (
-                price_data.get('regularMarketPrice', {}).get('raw') or
-                q.get('regularMarketPrice')
-            )
+            # Safe getter for nested dicts that may be empty
+            def _safe_raw(d, key):
+                val = d.get(key, {})
+                if isinstance(val, dict):
+                    return val.get('raw')
+                return val
+            
+            current_price = _safe_raw(price_data, 'regularMarketPrice') or q.get('regularMarketPrice')
             
             if not current_price or current_price <= 0:
                 return False, {}
@@ -66,62 +82,70 @@ class ProFinancialAnalyzer:
             info = {
                 'currentPrice': current_price,
                 'regularMarketPrice': current_price,
-                'previousClose': price_data.get('regularMarketPreviousClose', {}).get('raw') or q.get('regularMarketPreviousClose'),
-                'open': price_data.get('regularMarketOpen', {}).get('raw') or q.get('regularMarketOpen'),
-                'dayHigh': price_data.get('regularMarketDayHigh', {}).get('raw') or q.get('regularMarketDayHigh'),
-                'dayLow': price_data.get('regularMarketDayLow', {}).get('raw') or q.get('regularMarketDayLow'),
-                'volume': price_data.get('regularMarketVolume', {}).get('raw') or q.get('regularMarketVolume'),
-                'marketCap': price_data.get('marketCap', {}).get('raw') or q.get('marketCap') or summary.get('marketCap', {}).get('raw'),
-                'beta': stats.get('beta', {}).get('raw') or q.get('beta'),
-                'trailingPE': summary.get('trailingPE', {}).get('raw') or q.get('trailingPE'),
-                'returnOnEquity': fin_data.get('returnOnEquity', {}).get('raw') or q.get('returnOnEquity'),
-                'returnOnAssets': fin_data.get('returnOnAssets', {}).get('raw'),
-                'debtToEquity': fin_data.get('debtToEquity', {}).get('raw') or q.get('debtToEquity'),
-                'profitMargins': fin_data.get('profitMargins', {}).get('raw') or q.get('profitMargins'),
-                'revenueGrowth': fin_data.get('revenueGrowth', {}).get('raw') or q.get('revenueGrowth'),
-                'dividendYield': summary.get('dividendYield', {}).get('raw') or q.get('dividendYield'),
+                'previousClose': _safe_raw(price_data, 'regularMarketPreviousClose') or q.get('regularMarketPreviousClose'),
+                'open': _safe_raw(price_data, 'regularMarketOpen') or q.get('regularMarketOpen'),
+                'dayHigh': _safe_raw(price_data, 'regularMarketDayHigh') or q.get('regularMarketDayHigh'),
+                'dayLow': _safe_raw(price_data, 'regularMarketDayLow') or q.get('regularMarketDayLow'),
+                'volume': _safe_raw(price_data, 'regularMarketVolume') or q.get('regularMarketVolume'),
+                'marketCap': _safe_raw(price_data, 'marketCap') or q.get('marketCap') or _safe_raw(summary, 'marketCap'),
+                'beta': _safe_raw(stats, 'beta') or q.get('beta'),
+                'trailingPE': _safe_raw(summary, 'trailingPE') or q.get('trailingPE'),
+                'returnOnEquity': _safe_raw(fin_data, 'returnOnEquity') or q.get('returnOnEquity'),
+                'returnOnAssets': _safe_raw(fin_data, 'returnOnAssets'),
+                'debtToEquity': _safe_raw(fin_data, 'debtToEquity') or q.get('debtToEquity'),
+                'profitMargins': _safe_raw(fin_data, 'profitMargins') or q.get('profitMargins'),
+                'revenueGrowth': _safe_raw(fin_data, 'revenueGrowth') or q.get('revenueGrowth'),
+                'dividendYield': _safe_raw(summary, 'dividendYield') or q.get('dividendYield'),
                 'recommendationKey': fin_data.get('recommendationKey') or q.get('recommendationKey'),
-                'fiftyTwoWeekHigh': summary.get('fiftyTwoWeekHigh', {}).get('raw') or q.get('fiftyTwoWeekHigh'),
-                'fiftyTwoWeekLow': summary.get('fiftyTwoWeekLow', {}).get('raw') or q.get('fiftyTwoWeekLow'),
+                'fiftyTwoWeekHigh': _safe_raw(summary, 'fiftyTwoWeekHigh') or q.get('fiftyTwoWeekHigh'),
+                'fiftyTwoWeekLow': _safe_raw(summary, 'fiftyTwoWeekLow') or q.get('fiftyTwoWeekLow'),
                 'longName': q.get('longName', self.original_ticker),
                 'sector': q.get('sector', 'N/A'),
                 'industry': q.get('industry', 'N/A'),
                 'currency': q.get('currency', 'USD'),
-                'sharesOutstanding': stats.get('sharesOutstanding', {}).get('raw') or q.get('sharesOutstanding'),
+                'sharesOutstanding': _safe_raw(stats, 'sharesOutstanding') or q.get('sharesOutstanding'),
             }
             
             # ===== SMART FALLBACK: Only fetch missing critical data from yfinance =====
             missing_mcap = not info.get('marketCap')
-            missing_ratios = not info.get('trailingPE') and not info.get('returnOnEquity')
+            missing_price = not info.get('currentPrice')
             
-            if missing_mcap or missing_ratios:
+            if missing_mcap or missing_price:
                 try:
                     stock = _get_cached_ticker(self.ticker)
                     yf_info = stock.info
                     
                     if yf_info and isinstance(yf_info, dict):
-                        # Only fill in what's missing
                         if missing_mcap:
                             if yf_info.get('marketCap'):
                                 info['marketCap'] = yf_info['marketCap']
-                            elif yf_info.get('sharesOutstanding') and current_price:
-                                info['marketCap'] = yf_info['sharesOutstanding'] * current_price
+                            elif yf_info.get('sharesOutstanding') and info.get('currentPrice'):
+                                info['marketCap'] = yf_info['sharesOutstanding'] * info['currentPrice']
                         
-                        if missing_ratios:
-                            for key in ['trailingPE', 'returnOnEquity', 'debtToEquity',
-                                         'profitMargins', 'revenueGrowth', 'dividendYield',
-                                         'beta', 'returnOnAssets', 'priceToBook', 'trailingEps']:
-                                if not info.get(key) and yf_info.get(key):
-                                    info[key] = yf_info[key]
+                        if missing_price and yf_info.get('currentPrice'):
+                            info['currentPrice'] = yf_info['currentPrice']
+                            info['regularMarketPrice'] = yf_info['currentPrice']
+                        
+                        # Fill missing ratios
+                        for key in ['trailingPE', 'returnOnEquity', 'debtToEquity',
+                                     'profitMargins', 'revenueGrowth', 'dividendYield',
+                                     'beta', 'returnOnAssets', 'priceToBook', 'trailingEps']:
+                            if not info.get(key) and yf_info.get(key):
+                                info[key] = yf_info[key]
                 except:
                     pass
             
             # Calculate market cap from shares if still missing
-            if not info.get('marketCap') and info.get('sharesOutstanding') and current_price:
-                info['marketCap'] = info['sharesOutstanding'] * current_price
+            if not info.get('marketCap') and info.get('sharesOutstanding') and info.get('currentPrice'):
+                info['marketCap'] = info['sharesOutstanding'] * info['currentPrice']
             
             # Clean None values
             info = {k: v for k, v in info.items() if v is not None}
+            
+            # Final validation
+            if not info.get('currentPrice') or info['currentPrice'] <= 0:
+                return False, {}
+            
             return True, info
             
         except Exception:
