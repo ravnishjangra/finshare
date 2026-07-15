@@ -2,6 +2,7 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import time
 from config import CURRENCY_SYMBOLS, INDIAN_STOCKS_DB
 from core.fallback import MultiSourceFetcher
 
@@ -25,24 +26,82 @@ class ProFinancialAnalyzer:
         return ticker
 
     def get_live_price(self):
-        """Get price with aggressive fallback strategy"""
-        # Try 1: Yahoo Finance direct
+        """Get price - try yahooquery first (better on Cloud), then yfinance"""
+        
+        # Try 1: yahooquery (different endpoint, less rate-limited)
         try:
-            self.stock = yf.Ticker(self.ticker)
-            info = self.stock.info
-            if info:
-                price = info.get('currentPrice') or info.get('regularMarketPrice')
+            from yahooquery import Ticker as YQTicker
+            t = YQTicker(self.ticker)
+            quote = t.quotes
+            if quote and len(quote) > 0:
+                q = quote[0]
+                price = q.get('regularMarketPrice')
                 if price and price > 0:
-                    self._populate_from_info(info)
+                    self.live_price_data = {
+                        'current_price': price,
+                        'market_cap': q.get('marketCap'),
+                        'previous_close': q.get('regularMarketPreviousClose'),
+                        'open': q.get('regularMarketOpen'),
+                        'day_high': q.get('regularMarketDayHigh'),
+                        'day_low': q.get('regularMarketDayLow'),
+                        'volume': q.get('regularMarketVolume'),
+                        'beta': q.get('beta'),
+                        'fifty_two_week_high': q.get('fiftyTwoWeekHigh'),
+                        'fifty_two_week_low': q.get('fiftyTwoWeekLow'),
+                    }
+                    self.live_price_data = {k: v for k, v in self.live_price_data.items() if v is not None}
                     self.data_source = 'Yahoo Finance'
+                    # Try to set stock for financial data
+                    try:
+                        self.stock = yf.Ticker(self.ticker)
+                    except:
+                        pass
                     return True
         except:
             pass
 
-        # Try 2: Yahoo Finance history (works even when info fails)
+        # Try 2: Yahoo Finance with retry
+        for attempt in range(3):
+            try:
+                if attempt > 0: time.sleep(1.5)
+                self.stock = yf.Ticker(self.ticker)
+                info = self.stock.info
+                if info and len(info) > 5:
+                    price = info.get('currentPrice') or info.get('regularMarketPrice')
+                    if price and price > 0:
+                        self._populate_from_info(info)
+                        self.data_source = 'Yahoo Finance'
+                        return True
+            except:
+                pass
+
+        # Try 3: Alternate exchange
+        alts = []
+        if self.ticker.endswith('.NS'): alts = [self.ticker.replace('.NS', '.BO')]
+        elif self.ticker.endswith('.BO'): alts = [self.ticker.replace('.BO', '.NS')]
+        else: alts = [self.ticker + '.NS', self.ticker + '.BO']
+        
+        for alt in alts:
+            try:
+                time.sleep(0.5)
+                s = yf.Ticker(alt)
+                i = s.info
+                if i and len(i) > 5:
+                    p = i.get('currentPrice') or i.get('regularMarketPrice')
+                    if p and p > 0:
+                        self.stock = s
+                        self.ticker = alt
+                        self._populate_from_info(i)
+                        self.data_source = 'Yahoo Finance (alt)'
+                        return True
+            except:
+                pass
+
+        # Try 4: History fallback
         try:
-            self.stock = yf.Ticker(self.ticker)
-            hist = self.stock.history(period='1d')
+            if self.stock is None:
+                self.stock = yf.Ticker(self.ticker)
+            hist = self.stock.history(period='5d')
             if not hist.empty and 'Close' in hist.columns:
                 last = hist['Close'].iloc[-1]
                 if pd.notna(last) and last > 0:
@@ -51,19 +110,6 @@ class ProFinancialAnalyzer:
                     return True
         except:
             pass
-
-        # Try 3: Multi-source fallback
-        result = MultiSourceFetcher.fetch_price(self.ticker)
-        if result and result.get('current_price', 0) > 0:
-            self.live_price_data = {
-                'current_price': result['current_price'],
-                'market_cap': None, 'beta': None, 'recommendation': None,
-                'previous_close': None, 'open': None, 'day_high': None,
-                'day_low': None, 'volume': None, 'fifty_two_week_high': None,
-                'fifty_two_week_low': None, 'number_of_analysts': None,
-            }
-            self.data_source = result.get('source', 'fallback')
-            return True
 
         return False
 
@@ -88,27 +134,64 @@ class ProFinancialAnalyzer:
         try:
             if not self.stock:
                 self.stock = yf.Ticker(self.ticker)
-            info = self.stock.info
+            
+            # Retry getting info
+            info = {}
+            for attempt in range(3):
+                try:
+                    if attempt > 0: time.sleep(1)
+                    info = self.stock.info
+                    if info and len(info) > 5:
+                        break
+                except:
+                    pass
+            
             self.financials['info'] = info
             self.company_name = info.get('longName', self.original_ticker) or self.original_ticker
             self.financials['sector'] = info.get('sector', 'N/A')
             self.financials['industry'] = info.get('industry', 'N/A')
+            
+            # Get financial statements
             self.financials['income'] = self.stock.financials
             self.financials['balance'] = self.stock.balance_sheet
             self.financials['cashflow'] = self.stock.cashflow
+            
             self.financials['prices'] = self.stock.history(period="5y")
             self._detect_currency()
             return True
         except:
+            self.financials['income'] = pd.DataFrame()
+            self.financials['balance'] = pd.DataFrame()
+            self.financials['cashflow'] = pd.DataFrame()
+            self.financials['prices'] = pd.DataFrame()
+            self._detect_currency()
             return True
 
     def _detect_currency(self):
-        info = self.financials.get('info', {})
-        currency = info.get('currency', 'USD')
+        """Smart currency detection - works even without info dict"""
+        # Check ticker suffix first (most reliable)
         if self.ticker.endswith('.NS') or self.ticker.endswith('.BO'):
-            currency = 'INR'
-        self.currency = currency
-        self.currency_symbol = CURRENCY_SYMBOLS.get(currency, currency + ' ')
+            self.currency = 'INR'
+            self.currency_symbol = '₹'
+            return
+        
+        # Check info dict
+        info = self.financials.get('info', {})
+        currency = info.get('currency') or info.get('financialCurrency')
+        if currency:
+            self.currency = currency
+            self.currency_symbol = CURRENCY_SYMBOLS.get(currency, '$')
+            return
+        
+        # Check if original ticker is in Indian DB
+        if self.original_ticker in INDIAN_STOCKS_DB:
+            self.currency = 'INR'
+            self.currency_symbol = '₹'
+            return
+        
+        # Default USD
+        self.currency = 'USD'
+        self.currency_symbol = '$'
 
     def _format_amount(self, value):
         if value is None or pd.isna(value): return 'N/A'
@@ -177,7 +260,6 @@ class ProFinancialAnalyzer:
                         if eq and eq > 0: self.ratios['P/B Ratio'] = cp/(eq/shares)
                         if rev and rev > 0: self.ratios['P/S Ratio'] = cp/(rev/shares)
 
-            # Fallback from info dict
             for key, ratio_key, mult in [
                 ('returnOnEquity', 'ROE', 100), ('returnOnAssets', 'ROA', 100),
                 ('profitMargins', 'Net Profit Margin', 100), ('debtToEquity', 'Debt to Equity', 1),
