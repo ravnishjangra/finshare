@@ -1,10 +1,42 @@
-"""Main Financial Analyzer - Robust data fetching"""
+"""Main Financial Analyzer - Robust data fetching with caching"""
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import time
+import streamlit as st
 from config import CURRENCY_SYMBOLS, INDIAN_STOCKS_DB
 from core.fallback import MultiSourceFetcher
+
+# ===== CACHING FUNCTIONS (prevents rate limiting) =====
+
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def cached_yahoo_info(ticker):
+    """Cached Yahoo Finance info - reduces API calls"""
+    stock = yf.Ticker(ticker)
+    return stock.info
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def cached_financials(ticker):
+    """Cached financial statements - reduces API calls"""
+    stock = yf.Ticker(ticker)
+    return stock.financials, stock.balance_sheet, stock.cashflow
+
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def cached_yahooquery_data(ticker):
+    """Cached yahooquery data"""
+    from yahooquery import Ticker as YQTicker
+    t = YQTicker(ticker)
+    quote = t.quotes
+    if quote and len(quote) > 0:
+        return quote[0]
+    return None
+
+@st.cache_data(ttl=86400)  # Cache for 24 hours
+def cached_price_history(ticker):
+    """Cached 5-year price history"""
+    stock = yf.Ticker(ticker)
+    return stock.history(period="5y")
+
 
 class ProFinancialAnalyzer:
     def __init__(self, ticker, exchange="Auto"):
@@ -26,56 +58,37 @@ class ProFinancialAnalyzer:
         return ticker
 
     def get_live_price(self):
-        """Get price - try yahooquery first (better on Cloud), then yfinance"""
+        """Get price using CACHED data sources"""
         
-        # Try 1: yahooquery (different endpoint, less rate-limited)
+        # Try 1: Cached yahooquery (best for Cloud)
+        q = cached_yahooquery_data(self.ticker)
+        if q:
+            price = q.get('regularMarketPrice')
+            if price and price > 0:
+                self.live_price_data = {
+                    'current_price': price, 'market_cap': q.get('marketCap'),
+                    'previous_close': q.get('regularMarketPreviousClose'),
+                    'open': q.get('regularMarketOpen'), 'day_high': q.get('regularMarketDayHigh'),
+                    'day_low': q.get('regularMarketDayLow'), 'volume': q.get('regularMarketVolume'),
+                    'beta': q.get('beta'), 'fifty_two_week_high': q.get('fiftyTwoWeekHigh'),
+                    'fifty_two_week_low': q.get('fiftyTwoWeekLow'),
+                }
+                self.live_price_data = {k: v for k, v in self.live_price_data.items() if v is not None}
+                self.data_source = 'Yahoo Finance'
+                return True
+
+        # Try 2: Cached Yahoo Finance info
         try:
-            from yahooquery import Ticker as YQTicker
-            t = YQTicker(self.ticker)
-            quote = t.quotes
-            if quote and len(quote) > 0:
-                q = quote[0]
-                price = q.get('regularMarketPrice')
+            info = cached_yahoo_info(self.ticker)
+            if info and len(info) > 5:
+                price = info.get('currentPrice') or info.get('regularMarketPrice')
                 if price and price > 0:
-                    self.live_price_data = {
-                        'current_price': price,
-                        'market_cap': q.get('marketCap'),
-                        'previous_close': q.get('regularMarketPreviousClose'),
-                        'open': q.get('regularMarketOpen'),
-                        'day_high': q.get('regularMarketDayHigh'),
-                        'day_low': q.get('regularMarketDayLow'),
-                        'volume': q.get('regularMarketVolume'),
-                        'beta': q.get('beta'),
-                        'fifty_two_week_high': q.get('fiftyTwoWeekHigh'),
-                        'fifty_two_week_low': q.get('fiftyTwoWeekLow'),
-                    }
-                    self.live_price_data = {k: v for k, v in self.live_price_data.items() if v is not None}
+                    self._populate_from_info(info)
                     self.data_source = 'Yahoo Finance'
-                    # Try to set stock for financial data
-                    try:
-                        self.stock = yf.Ticker(self.ticker)
-                    except:
-                        pass
                     return True
-        except:
-            pass
+        except: pass
 
-        # Try 2: Yahoo Finance with retry
-        for attempt in range(3):
-            try:
-                if attempt > 0: time.sleep(1.5)
-                self.stock = yf.Ticker(self.ticker)
-                info = self.stock.info
-                if info and len(info) > 5:
-                    price = info.get('currentPrice') or info.get('regularMarketPrice')
-                    if price and price > 0:
-                        self._populate_from_info(info)
-                        self.data_source = 'Yahoo Finance'
-                        return True
-            except:
-                pass
-
-        # Try 3: Alternate exchange
+        # Try 3: Alternate exchange (cached)
         alts = []
         if self.ticker.endswith('.NS'): alts = [self.ticker.replace('.NS', '.BO')]
         elif self.ticker.endswith('.BO'): alts = [self.ticker.replace('.BO', '.NS')]
@@ -83,24 +96,20 @@ class ProFinancialAnalyzer:
         
         for alt in alts:
             try:
-                time.sleep(0.5)
-                s = yf.Ticker(alt)
-                i = s.info
-                if i and len(i) > 5:
-                    p = i.get('currentPrice') or i.get('regularMarketPrice')
+                info = cached_yahoo_info(alt)
+                if info and len(info) > 5:
+                    p = info.get('currentPrice') or info.get('regularMarketPrice')
                     if p and p > 0:
-                        self.stock = s
+                        self.stock = yf.Ticker(alt)
                         self.ticker = alt
-                        self._populate_from_info(i)
+                        self._populate_from_info(info)
                         self.data_source = 'Yahoo Finance (alt)'
                         return True
-            except:
-                pass
+            except: pass
 
-        # Try 4: History fallback
+        # Try 4: History
         try:
-            if self.stock is None:
-                self.stock = yf.Ticker(self.ticker)
+            self.stock = yf.Ticker(self.ticker)
             hist = self.stock.history(period='5d')
             if not hist.empty and 'Close' in hist.columns:
                 last = hist['Close'].iloc[-1]
@@ -108,9 +117,8 @@ class ProFinancialAnalyzer:
                     self.live_price_data = {'current_price': float(last)}
                     self.data_source = 'Yahoo Finance (history)'
                     return True
-        except:
-            pass
-
+        except: pass
+        
         return False
 
     def _populate_from_info(self, info):
@@ -124,74 +132,88 @@ class ProFinancialAnalyzer:
             'market_cap': info.get('marketCap'),
             'fifty_two_week_high': info.get('fiftyTwoWeekHigh'),
             'fifty_two_week_low': info.get('fiftyTwoWeekLow'),
-            'beta': info.get('beta'),
-            'recommendation': info.get('recommendationKey'),
+            'beta': info.get('beta'), 'recommendation': info.get('recommendationKey'),
             'number_of_analysts': info.get('numberOfAnalystOpinions'),
         }
         self.live_price_data = {k: v for k, v in self.live_price_data.items() if v is not None}
 
     def fetch_financial_data(self):
+        """Fetch financial data using CACHED sources"""
+        
+        # Get cached info
+        info = {}
         try:
-            if not self.stock:
-                self.stock = yf.Ticker(self.ticker)
-            
-            # Retry getting info
-            info = {}
-            for attempt in range(3):
-                try:
-                    if attempt > 0: time.sleep(1)
-                    info = self.stock.info
-                    if info and len(info) > 5:
-                        break
-                except:
-                    pass
-            
-            self.financials['info'] = info
-            self.company_name = info.get('longName', self.original_ticker) or self.original_ticker
-            self.financials['sector'] = info.get('sector', 'N/A')
-            self.financials['industry'] = info.get('industry', 'N/A')
-            
-            # Get financial statements
-            self.financials['income'] = self.stock.financials
-            self.financials['balance'] = self.stock.balance_sheet
-            self.financials['cashflow'] = self.stock.cashflow
-            
-            self.financials['prices'] = self.stock.history(period="5y")
-            self._detect_currency()
-            return True
+            info = cached_yahoo_info(self.ticker)
+        except: pass
+        
+        # Fallback to yahooquery for info
+        if not info or len(info) < 5:
+            q = cached_yahooquery_data(self.ticker)
+            if q:
+                info = {
+                    'longName': q.get('longName', self.original_ticker),
+                    'sector': q.get('sector', 'N/A'), 'industry': q.get('industry', 'N/A'),
+                    'marketCap': q.get('marketCap'), 'currency': q.get('currency'),
+                    'beta': q.get('beta'), 'trailingPE': q.get('trailingPE'),
+                    'returnOnEquity': q.get('returnOnEquity'),
+                    'debtToEquity': q.get('debtToEquity'),
+                    'dividendYield': q.get('dividendYield'),
+                    'revenueGrowth': q.get('revenueGrowth'),
+                    'profitMargins': q.get('profitMargins'),
+                    'currentRatio': q.get('currentRatio'),
+                }
+        
+        self.financials['info'] = info
+        self.company_name = info.get('longName', self.original_ticker) or self.original_ticker
+        self.financials['sector'] = info.get('sector', 'N/A')
+        self.financials['industry'] = info.get('industry', 'N/A')
+
+        # Get cached financial statements
+        try:
+            income, balance, cashflow = cached_financials(self.ticker)
         except:
-            self.financials['income'] = pd.DataFrame()
-            self.financials['balance'] = pd.DataFrame()
-            self.financials['cashflow'] = pd.DataFrame()
+            income = pd.DataFrame()
+            balance = pd.DataFrame()
+            cashflow = pd.DataFrame()
+        
+        # Try alternate ticker if empty
+        if income.empty:
+            alts = []
+            if self.ticker.endswith('.NS'): alts = [self.ticker.replace('.NS', '.BO')]
+            elif self.ticker.endswith('.BO'): alts = [self.ticker.replace('.BO', '.NS')]
+            else: alts = [self.ticker + '.NS', self.ticker + '.BO']
+            for alt in alts:
+                try:
+                    income, balance, cashflow = cached_financials(alt)
+                    if not income.empty:
+                        self.ticker = alt
+                        break
+                except: pass
+
+        self.financials['income'] = income
+        self.financials['balance'] = balance
+        self.financials['cashflow'] = cashflow
+
+        # Get cached price history
+        try:
+            self.financials['prices'] = cached_price_history(self.ticker)
+        except:
             self.financials['prices'] = pd.DataFrame()
-            self._detect_currency()
-            return True
+
+        self._detect_currency()
+        return True
 
     def _detect_currency(self):
-        """Smart currency detection - works even without info dict"""
-        # Check ticker suffix first (most reliable)
         if self.ticker.endswith('.NS') or self.ticker.endswith('.BO'):
-            self.currency = 'INR'
-            self.currency_symbol = '₹'
-            return
-        
-        # Check info dict
+            self.currency = 'INR'; self.currency_symbol = '₹'; return
         info = self.financials.get('info', {})
         currency = info.get('currency') or info.get('financialCurrency')
         if currency:
             self.currency = currency
-            self.currency_symbol = CURRENCY_SYMBOLS.get(currency, '$')
-            return
-        
-        # Check if original ticker is in Indian DB
+            self.currency_symbol = CURRENCY_SYMBOLS.get(currency, '$'); return
         if self.original_ticker in INDIAN_STOCKS_DB:
-            self.currency = 'INR'
-            self.currency_symbol = '₹'
-            return
-        
-        # Default USD
-        self.currency = 'USD'
-        self.currency_symbol = '$'
+            self.currency = 'INR'; self.currency_symbol = '₹'; return
+        self.currency = 'USD'; self.currency_symbol = '$'
 
     def _format_amount(self, value):
         if value is None or pd.isna(value): return 'N/A'
@@ -254,8 +276,7 @@ class ProFinancialAnalyzer:
                     shares = self._safe_get(income, ['Diluted Average Shares']) or self._safe_get(income, ['Basic Average Shares'])
                     if shares and shares > 0:
                         if ni:
-                            eps = ni/shares
-                            self.ratios['EPS'] = eps
+                            eps = ni/shares; self.ratios['EPS'] = eps
                             if eps > 0: self.ratios['P/E Ratio'] = cp/eps
                         if eq and eq > 0: self.ratios['P/B Ratio'] = cp/(eq/shares)
                         if rev and rev > 0: self.ratios['P/S Ratio'] = cp/(rev/shares)

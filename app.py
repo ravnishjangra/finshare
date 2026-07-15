@@ -54,8 +54,9 @@ def main():
     with tab1:
         c1, c2, c3 = st.columns([3, 1.5, 1])
         with c1:
-            ticker = st.text_input("Stock Ticker", value=st.session_state['current_ticker'], 
-                                   key="main_ticker", placeholder="e.g., AAPL, RELIANCE")
+            ticker = st.text_input("Stock Ticker", 
+                       value=st.session_state.get('current_ticker', 'AAPL'), 
+                       key="main_ticker", placeholder="e.g., AAPL, RELIANCE")
         with c2:
             exchange = st.selectbox("Exchange", ["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"], 
                                     index=["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"].index(st.session_state['current_exchange']),
