@@ -20,17 +20,174 @@ st.set_page_config(page_title="Finshare Pro", page_icon="📊", layout="wide")
 
 st.markdown("""
 <style>
-    .main-header { font-size: 2.8rem; font-weight: 900; text-align: center; margin-bottom: 0.5rem; }
-    .sub-header { font-size: 1rem; color: #94a3b8; text-align: center; margin-bottom: 2rem; }
-    .card { background: #1e293b; border: 1px solid rgba(102,126,234,0.2); padding: 1.5rem; border-radius: 16px; }
-    .metric-value { font-size: 1.8rem; font-weight: 700; color: #e2e8f0; }
-    .metric-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
-    .live-price-box { background: linear-gradient(135deg, #0f172a, #1e293b); border: 2px solid rgba(102,126,234,0.4); padding: 2rem; border-radius: 20px; color: white; text-align: center; }
-    .price-up { color: #10b981; font-size: 3rem; font-weight: 900; }
-    .price-down { color: #ef4444; font-size: 3rem; font-weight: 900; }
-    .section-header { font-size: 1.4rem; font-weight: 700; color: #e2e8f0; margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid rgba(102,126,234,0.3); }
-    .stButton button { width: 100%; border-radius: 12px; padding: 0.6rem; font-weight: 600; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; }
-    .info-box { background: #1e293b; padding: 1rem; border-radius: 12px; color: #e2e8f0; margin: 0.5rem 0; }
+    /* ===== GLOBAL ===== */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    
+    /* ===== HEADERS ===== */
+    .main-header { 
+        font-size: 3rem; font-weight: 900; text-align: center; margin-bottom: 0.3rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 40%, #f093fb 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        letter-spacing: -0.5px;
+    }
+    .sub-header { 
+        font-size: 0.95rem; color: #94a3b8; text-align: center; margin-bottom: 2.5rem; 
+        letter-spacing: 0.5px;
+    }
+    
+    /* ===== CARDS ===== */
+    .card { 
+        background: linear-gradient(145deg, #1e293b, #0f172a); 
+        border: 1px solid rgba(102,126,234,0.12); 
+        padding: 1.3rem; border-radius: 14px; 
+        transition: all 0.25s ease;
+        position: relative; overflow: hidden;
+    }
+    .card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(102,126,234,0.3), transparent);
+        opacity: 0; transition: opacity 0.25s;
+    }
+    .card:hover { 
+        transform: translateY(-2px); 
+        box-shadow: 0 12px 30px rgba(0,0,0,0.3), 0 0 0 1px rgba(102,126,234,0.2);
+    }
+    .card:hover::before { opacity: 1; }
+    .metric-value { font-size: 1.7rem; font-weight: 700; color: #f1f5f9; line-height: 1.2; }
+    .metric-label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-top: 0.3rem; }
+    
+    /* ===== LIVE PRICE ===== */
+    .live-price-box { 
+        background: linear-gradient(135deg, #0f172a 0%, #1a1f3a 50%, #0f172a 100%); 
+        border: 2px solid rgba(102,126,234,0.25); 
+        padding: 2rem; border-radius: 20px; 
+        color: white; text-align: center; 
+        box-shadow: 0 20px 50px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+    .price-up { color: #10b981; font-size: 3rem; font-weight: 900; text-shadow: 0 0 40px rgba(16,185,129,0.2); }
+    .price-down { color: #ef4444; font-size: 3rem; font-weight: 900; text-shadow: 0 0 40px rgba(239,68,68,0.2); }
+    .company-name { font-size: 1.3rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.5rem; }
+    .price-change { font-size: 1.1rem; font-weight: 500; margin-top: 0.3rem; }
+    
+    /* ===== SECTION HEADERS ===== */
+    .section-header { 
+        font-size: 1.25rem; font-weight: 700; color: #f1f5f9; 
+        margin: 2.5rem 0 1rem 0; padding-bottom: 0.6rem;
+        border-bottom: 2px solid rgba(102,126,234,0.2);
+        display: flex; align-items: center; gap: 0.6rem;
+    }
+    
+    /* ===== BUTTONS ===== */
+    .stButton button { 
+        width: 100%; border-radius: 10px; padding: 0.5rem 1.2rem; 
+        font-weight: 600; font-size: 0.9rem; letter-spacing: 0.3px;
+        background: linear-gradient(135deg, #667eea, #764ba2); 
+        color: white; border: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative; overflow: hidden;
+    }
+    .stButton button::after {
+        content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        transition: left 0.5s;
+    }
+    .stButton button:hover { 
+        transform: translateY(-1px); 
+        box-shadow: 0 8px 25px rgba(102,126,234,0.35); 
+    }
+    .stButton button:hover::after { left: 100%; }
+    
+    /* ===== INPUTS ===== */
+    .stTextInput input, .stSelectbox select {
+        border-radius: 10px !important; border: 1px solid rgba(102,126,234,0.2) !important;
+        background: #1e293b !important; color: #e2e8f0 !important;
+        transition: border-color 0.3s !important;
+    }
+    .stTextInput input:focus, .stSelectbox select:focus {
+        border-color: #667eea !important; box-shadow: 0 0 0 2px rgba(102,126,234,0.15) !important;
+    }
+    
+    /* ===== INFO BOX ===== */
+    .info-box { 
+        background: linear-gradient(135deg, #1e293b, #162032); 
+        padding: 0.9rem 1.3rem; border-radius: 12px; 
+        color: #e2e8f0; margin: 0.8rem 0; 
+        border-left: 3px solid #667eea;
+        font-size: 0.9rem; font-weight: 500;
+    }
+    
+    /* ===== TABS ===== */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem; background: #0f172a; 
+        padding: 0.5rem; border-radius: 14px;
+        border: 1px solid rgba(102,126,234,0.1);
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 10px; padding: 0.6rem 1.2rem;
+        font-weight: 500; color: #94a3b8; font-size: 0.9rem;
+        transition: all 0.3s;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+        color: white !important; font-weight: 600;
+        box-shadow: 0 4px 12px rgba(102,126,234,0.3);
+    }
+    
+    /* ===== METRICS ===== */
+    [data-testid="stMetricValue"] { font-weight: 700; color: #f1f5f9; }
+    [data-testid="stMetricDelta"] { font-weight: 600; }
+    
+    /* ===== EXPANDERS ===== */
+    .streamlit-expanderHeader {
+        background: #1e293b; border-radius: 10px !important;
+        font-weight: 600; font-size: 0.9rem; color: #e2e8f0 !important;
+        border: 1px solid rgba(102,126,234,0.15) !important;
+    }
+    .streamlit-expanderHeader:hover { border-color: #667eea !important; }
+    
+    /* ===== DATAFRAMES ===== */
+    [data-testid="stDataFrame"] { 
+        border-radius: 12px; overflow: hidden; 
+        border: 1px solid rgba(102,126,234,0.1);
+    }
+    
+    /* ===== SUGGESTIONS ===== */
+    .suggestion-grid {
+        display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;
+    }
+    
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in { animation: fadeInUp 0.4s ease-out; }
+    
+    @keyframes shimmer {
+        0% { background-position: -200px 0; }
+        100% { background-position: 200px 0; }
+    }
+    
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    /* ===== DIVIDER ===== */
+    hr { border-color: rgba(102,126,234,0.1) !important; margin: 2rem 0 !important; }
+    
+    /* ===== WARNINGS/ERRORS ===== */
+    .stAlert { border-radius: 10px !important; border: none !important; }
+    
+    /* ===== EMPTY STATE ===== */
+    .empty-state { 
+        text-align: center; padding: 4rem 2rem; 
+        background: linear-gradient(135deg, #1e293b, #0f172a);
+        border-radius: 20px; border: 1px dashed rgba(102,126,234,0.2);
+    }
+    .empty-state h2 { color: #e2e8f0; margin-bottom: 0.5rem; }
+    .empty-state p { color: #94a3b8; font-size: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -48,7 +205,7 @@ ALL_STOCKS = get_all_stocks()
 
 def main():
     st.markdown('<h1 class="main-header">📊 Finshare Pro</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Advanced DCF • Stress Tests • Portfolio Optimizer • Technical Analysis</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">DCF Valuation • Factor Investing • Risk Models • Portfolio Analytics • Monte Carlo</p>', unsafe_allow_html=True)
 
     if 'current_ticker' not in st.session_state:
         st.session_state['current_ticker'] = "AAPL"
@@ -94,17 +251,14 @@ def main():
             st.write("")
             analyze_btn = st.button("🔍 Analyze", type="primary", use_container_width=True)
 
-        # Update session state
         if ticker_input:
             st.session_state['current_ticker'] = ticker_input.upper().strip()
         if exchange:
             st.session_state['current_exchange'] = exchange
 
-        # Handle analyze button - set state directly, no rerun needed
         if analyze_btn:
             st.session_state['analyze_clicked'] = True
 
-        # Suggestions
         if ticker_input and len(ticker_input) >= 1:
             search_term = ticker_input.upper().strip()
             suggestions = [s for s in ALL_STOCKS if search_term in s][:8]
@@ -121,7 +275,6 @@ def main():
             else:
                 st.caption(f"'{ticker_input}' not in quick list but will be searched on Yahoo Finance.")
 
-        # Display results
         if st.session_state['analyze_clicked'] and st.session_state['current_ticker']:
             ticker_to_analyze = st.session_state['current_ticker']
             exchange_to_use = st.session_state['current_exchange']
@@ -147,11 +300,11 @@ def main():
                             ch_pct = (ch/pc)*100
                             color = "price-up" if ch >= 0 else "price-down"
                             arrow = "▲" if ch >= 0 else "▼"
-                            st.markdown(f'<div class="live-price-box"><h2>{analyzer.company_name}</h2><div class="{color}">{cur}{cp:.2f} {arrow}</div><div>{cur}{abs(ch):.2f} ({ch_pct:+.2f}%)</div><p style="color:#94a3b8;font-size:0.8rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="live-price-box"><div class="company-name">{analyzer.company_name}</div><div class="{color}">{cur}{cp:.2f} <span style="font-size:1.5rem;">{arrow}</span></div><div class="price-change" style="color:{"#10b981" if ch>=0 else "#ef4444"}">{cur}{abs(ch):.2f} ({ch_pct:+.2f}%)</div><p style="color:#64748b;font-size:0.75rem;margin-top:0.5rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
                         elif cp:
-                            st.markdown(f'<div class="live-price-box"><h2>{analyzer.company_name}</h2><div style="font-size:3rem;font-weight:900;">{cur}{cp:.2f}</div><p style="color:#94a3b8;font-size:0.8rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="live-price-box"><div class="company-name">{analyzer.company_name}</div><div style="font-size:3rem;font-weight:900;">{cur}{cp:.2f}</div><p style="color:#64748b;font-size:0.75rem;margin-top:0.5rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
 
-                        st.markdown(f'<div class="info-box">📊 {analyzer.company_name} | {analyzer.financials.get("sector","N/A")} | {analyzer.currency} | MCap: {analyzer._format_amount(pd_d.get("market_cap",0))}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="info-box">📊 <b>{analyzer.company_name}</b> • {analyzer.financials.get("sector","N/A")} • {analyzer.currency} • MCap: {analyzer._format_amount(pd_d.get("market_cap",0))}</div>', unsafe_allow_html=True)
 
                         ratios = analyzer.ratios
                         if ratios:
@@ -165,7 +318,7 @@ def main():
                                 with col:
                                     if isinstance(v, (int, float)):
                                         d = f"{v:.1f}%" if l in ['ROE %', 'Div Yld'] else f"{v:.2f}"
-                                        st.markdown(f'<div class="card"><div class="metric-value">{d}</div><div class="metric-label">{l}</div></div>', unsafe_allow_html=True)
+                                        st.markdown(f'<div class="card animate-in"><div class="metric-value">{d}</div><div class="metric-label">{l}</div></div>', unsafe_allow_html=True)
 
                         create_valuation_dashboard(analyzer)
                         create_advanced_scores_dashboard(analyzer)
@@ -197,7 +350,11 @@ def main():
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)[:100]}. Please try again.")
         elif not st.session_state.get('analyze_clicked'):
-            st.markdown('<div style="text-align:center;padding:4rem;"><h2>🏦 Finshare Pro</h2><p>Type any ticker above, select exchange, and click Analyze</p><p style="color:#94a3b8;">Works for ALL Indian stocks (.NS) and US stocks</p></div>', unsafe_allow_html=True)
+            st.markdown('''<div class="empty-state">
+                <h2>🏦 Welcome to Finshare Pro</h2>
+                <p>Type any ticker above, select exchange, and click Analyze</p>
+                <p style="color:#64748b;font-size:0.9rem;">Works for ALL Indian stocks (.NS) and US stocks</p>
+            </div>''', unsafe_allow_html=True)
 
     with tab2:
         st.markdown("### 🛡️ Stress Tests")
