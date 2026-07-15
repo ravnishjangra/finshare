@@ -62,7 +62,7 @@ class ProFinancialAnalyzer:
         
         # Try 1: Cached yahooquery (best for Cloud)
         q = cached_yahooquery_data(self.ticker)
-        if q:
+        if q and isinstance(q, dict):
             price = q.get('regularMarketPrice')
             if price and price > 0:
                 self.live_price_data = {
@@ -80,7 +80,7 @@ class ProFinancialAnalyzer:
         # Try 2: Cached Yahoo Finance info
         try:
             info = cached_yahoo_info(self.ticker)
-            if info and len(info) > 5:
+            if info and isinstance(info, dict) and len(info) > 5:
                 price = info.get('currentPrice') or info.get('regularMarketPrice')
                 if price and price > 0:
                     self._populate_from_info(info)
@@ -97,7 +97,7 @@ class ProFinancialAnalyzer:
         for alt in alts:
             try:
                 info = cached_yahoo_info(alt)
-                if info and len(info) > 5:
+                if info and isinstance(info, dict) and len(info) > 5:
                     p = info.get('currentPrice') or info.get('regularMarketPrice')
                     if p and p > 0:
                         self.stock = yf.Ticker(alt)
@@ -149,7 +149,7 @@ class ProFinancialAnalyzer:
         # Fallback to yahooquery for info
         if not info or len(info) < 5:
             q = cached_yahooquery_data(self.ticker)
-            if q:
+            if q and isinstance(q, dict):
                 info = {
                     'longName': q.get('longName', self.original_ticker),
                     'sector': q.get('sector', 'N/A'), 'industry': q.get('industry', 'N/A'),
