@@ -178,7 +178,6 @@ class ProFinancialAnalyzer:
     def get_live_price(self):
         """Priority: 1) yfinance (with retry) 2) yahooquery 3) API fallbacks"""
         
-        # Try 1: yfinance with retry
         success, info, stock = self._try_yfinance()
         if success:
             self._populate_from_info(info)
@@ -187,7 +186,6 @@ class ProFinancialAnalyzer:
             self.data_source = 'Yahoo Finance'
             return True
 
-        # Try 2: yahooquery
         success, info = self._try_yahooquery()
         if success and info.get('currentPrice'):
             self._populate_from_info(info)
@@ -196,7 +194,6 @@ class ProFinancialAnalyzer:
             self.stock = _get_cached_ticker(self.ticker)
             return True
 
-        # Try 3: API fallbacks
         info, source = self._try_api_fallback()
         if info:
             self.live_price_data = {'current_price': info.get('currentPrice')}
@@ -335,6 +332,18 @@ class ProFinancialAnalyzer:
             balance = self.financials.get('balance')
             info = self.financials.get('info', {})
 
+            # ===== SANITY LIMITS for ratios =====
+            LIMITS = {
+                'Dividend Yield': (0, 50),
+                'Debt to Equity': (0, 20),
+                'P/E Ratio': (0, 1000),
+                'P/B Ratio': (0, 100),
+                'ROE': (-100, 100),
+                'ROA': (-100, 100),
+                'Net Profit Margin': (-100, 100),
+                'Revenue Growth (YoY)': (-200, 500),
+            }
+
             if isinstance(info, dict):
                 ratio_map = [
                     ('returnOnEquity', 'ROE', 100), ('returnOnAssets', 'ROA', 100),
@@ -347,7 +356,13 @@ class ProFinancialAnalyzer:
                     val = info.get(key)
                     if val is not None and ratio_key not in self.ratios:
                         try:
-                            self.ratios[ratio_key] = float(val) * mult
+                            calculated = float(val) * mult
+                            # Apply sanity limits
+                            if ratio_key in LIMITS:
+                                low, high = LIMITS[ratio_key]
+                                if calculated < low or calculated > high:
+                                    continue  # Skip unrealistic values
+                            self.ratios[ratio_key] = calculated
                         except (ValueError, TypeError):
                             pass
 
