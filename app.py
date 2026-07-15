@@ -46,10 +46,10 @@ def get_all_stocks():
 ALL_STOCKS = get_all_stocks()
 
 @st.cache_resource
-def get_analyzer(ticker, exchange):
+def get_analyzer(_ticker, _exchange):
     """Cache the analyzer to avoid repeated API calls"""
     em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
-    analyzer = ProFinancialAnalyzer(ticker.upper().strip(), exchange=em.get(exchange, "Auto"))
+    analyzer = ProFinancialAnalyzer(_ticker.upper().strip(), exchange=em.get(_exchange, "Auto"))
     analyzer.get_live_price()
     analyzer.fetch_financial_data()
     analyzer.calculate_all_ratios()
@@ -59,6 +59,7 @@ def main():
     st.markdown('<h1 class="main-header">📊 Finshare Pro</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Advanced DCF • Stress Tests • Portfolio Optimizer • Technical Analysis</p>', unsafe_allow_html=True)
 
+    # Initialize session state
     if 'current_ticker' not in st.session_state:
         st.session_state['current_ticker'] = "AAPL"
     if 'current_exchange' not in st.session_state:
@@ -78,33 +79,45 @@ def main():
         with c1:
             ticker_input = st.text_input(
                 "Stock Ticker",
-                value=st.session_state.get('current_ticker', ''),
-                key="main_ticker",
-                placeholder="Type any ticker (e.g., AAPL, RELIANCE, ITC)...",
+                value=st.session_state['current_ticker'],
+                key="main_ticker_widget",
+                placeholder="Type any ticker (e.g., AAPL, RELIANCE, VEDL)...",
             )
-            ticker = ticker_input.upper().strip() if ticker_input else ''
         
         with c2:
-            if ticker in ALL_STOCKS:
-                auto_exchange = ALL_STOCKS[ticker][0]
-            elif ticker.endswith('.NS'):
-                auto_exchange = "NSE India (.NS)"
-            elif ticker.endswith('.BO'):
-                auto_exchange = "BSE India (.BO)"
+            # Determine exchange
+            ticker_upper = ticker_input.upper().strip() if ticker_input else ''
+            
+            if ticker_upper in ALL_STOCKS:
+                default_exchange = ALL_STOCKS[ticker_upper][0]
+            elif ticker_upper.endswith('.NS'):
+                default_exchange = "NSE India (.NS)"
+            elif ticker_upper.endswith('.BO'):
+                default_exchange = "BSE India (.BO)"
             else:
-                auto_exchange = st.session_state.get('current_exchange', 'Auto-detect')
+                default_exchange = st.session_state.get('current_exchange', 'Auto-detect')
+            
+            exchange_options = ["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"]
+            default_idx = exchange_options.index(default_exchange) if default_exchange in exchange_options else 0
             
             exchange = st.selectbox(
                 "Exchange",
-                ["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"],
-                index=["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"].index(auto_exchange) if auto_exchange in ["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"] else 0,
-                key="main_exchange"
+                exchange_options,
+                index=default_idx,
+                key="main_exchange_widget"
             )
         
         with c3:
             st.write("")
-            analyze_btn = st.button("🔍 Analyze", type="primary", use_container_width=True, key="main_analyze_btn")
+            analyze_btn = st.button("🔍 Analyze", type="primary", use_container_width=True)
 
+        # Update session state from inputs
+        if ticker_input:
+            st.session_state['current_ticker'] = ticker_input.upper().strip()
+        if exchange:
+            st.session_state['current_exchange'] = exchange
+
+        # Suggestions
         if ticker_input and len(ticker_input) >= 1:
             search_term = ticker_input.upper().strip()
             suggestions = [s for s in ALL_STOCKS if search_term in s][:8]
@@ -120,23 +133,24 @@ def main():
                             st.session_state['analyze_clicked'] = True
                             st.rerun()
             else:
-                st.caption(f"'{ticker_input}' not in quick list. Select 'NSE India (.NS)' and click Analyze to search entire Indian market.")
+                st.caption(f"'{ticker_input}' not in quick list but will be searched on Yahoo Finance.")
 
-        if ticker:
-            st.session_state['current_ticker'] = ticker
-        if exchange:
-            st.session_state['current_exchange'] = exchange
-
+        # Handle analyze button
         if analyze_btn:
             st.session_state['analyze_clicked'] = True
+            st.rerun()  # Force rerun to use updated session state
 
-        if st.session_state.get('analyze_clicked', False) and ticker:
-            with st.spinner(f"🔍 Fetching data for {ticker}..."):
+        # Display results if analyze was clicked
+        if st.session_state['analyze_clicked'] and st.session_state['current_ticker']:
+            ticker_to_analyze = st.session_state['current_ticker']
+            exchange_to_use = st.session_state['current_exchange']
+            
+            with st.spinner(f"🔍 Fetching data for {ticker_to_analyze}..."):
                 try:
-                    analyzer = get_analyzer(ticker, exchange)
+                    analyzer = get_analyzer(ticker_to_analyze, exchange_to_use)
                     
                     if not analyzer.live_price_data.get('current_price'):
-                        st.error(f"❌ Could not fetch data for **{ticker}**. Try again in a moment.")
+                        st.error(f"❌ Could not fetch data for **{ticker_to_analyze}**. Try again in a moment.")
                     else:
                         pd_d = analyzer.live_price_data
                         cur = analyzer.currency_symbol
@@ -196,9 +210,10 @@ def main():
                                     st.info("Not available.")
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)[:100]}. Please try again.")
-        elif not ticker:
+        elif not st.session_state.get('analyze_clicked'):
             st.markdown('<div style="text-align:center;padding:4rem;"><h2>🏦 Finshare Pro</h2><p>Type any ticker above, select exchange, and click Analyze</p><p style="color:#94a3b8;">Works for ALL Indian stocks (.NS) and US stocks</p></div>', unsafe_allow_html=True)
 
+    # Tabs 2-5 remain the same...
     with tab2:
         st.markdown("### 🛡️ Stress Tests")
         col1, col2 = st.columns([2, 1])
