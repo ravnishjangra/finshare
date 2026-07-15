@@ -15,10 +15,8 @@ from dashboards.index_compare import create_index_comparison_dashboard
 from dashboards.portfolio_opt import create_portfolio_optimization_tab
 from dashboards.advanced_portfolio import create_advanced_portfolio_tab
 
-# MUST be first Streamlit command
 st.set_page_config(page_title="Finshare Pro", page_icon="📊", layout="wide")
 
-# Clear cache on first load / reboot
 if 'app_initialized' not in st.session_state:
     st.session_state.clear()
     st.cache_data.clear()
@@ -37,12 +35,9 @@ st.markdown("""
     .section-header { font-size: 1.4rem; font-weight: 700; color: #e2e8f0; margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid rgba(102,126,234,0.3); }
     .stButton button { width: 100%; border-radius: 12px; padding: 0.6rem; font-weight: 600; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; }
     .info-box { background: #1e293b; padding: 1rem; border-radius: 12px; color: #e2e8f0; margin: 0.5rem 0; }
-    .suggestion-btn { background: #1e293b; border: 1px solid rgba(102,126,234,0.3); padding: 0.5rem; border-radius: 8px; text-align: center; cursor: pointer; font-size: 0.9rem; }
-    .suggestion-btn:hover { background: #2d3a5c; border-color: #667eea; }
 </style>
 """, unsafe_allow_html=True)
 
-# Build stock database for suggestions
 def get_all_stocks():
     all_stocks = {}
     for s in ["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","JPM","V","WMT",
@@ -71,7 +66,6 @@ def main():
         "🎯 Portfolio", "🏦 Advanced"
     ])
 
-    # ===== TAB 1: STOCK ANALYSIS =====
     with tab1:
         st.markdown("### 🔍 Search Stock")
         
@@ -81,13 +75,11 @@ def main():
                 "Stock Ticker",
                 value=st.session_state.get('current_ticker', ''),
                 key="main_ticker",
-                placeholder="Type ticker (e.g., AAPL, RELIANCE)...",
-                autocomplete="off"
+                placeholder="Type any ticker (e.g., AAPL, RELIANCE, ITC)...",
             )
             ticker = ticker_input.upper().strip() if ticker_input else ''
         
         with c2:
-            # Auto-detect exchange
             if ticker in ALL_STOCKS:
                 auto_exchange = ALL_STOCKS[ticker][0]
             elif ticker.endswith('.NS'):
@@ -108,7 +100,6 @@ def main():
             st.write("")
             analyze_btn = st.button("🔍 Analyze", type="primary", use_container_width=True, key="main_analyze_btn")
 
-        # === SMART SUGGESTIONS ===
         if ticker_input and len(ticker_input) >= 1:
             search_term = ticker_input.upper().strip()
             suggestions = [s for s in ALL_STOCKS if search_term in s][:8]
@@ -123,8 +114,8 @@ def main():
                             st.session_state['current_exchange'] = ALL_STOCKS[stock][0]
                             st.session_state['analyze_clicked'] = True
                             st.rerun()
-            elif len(search_term) >= 2:
-                st.caption("No matches. Try a different ticker.")
+            else:
+                st.caption(f"'{ticker_input}' not in quick list. Select 'NSE India (.NS)' and click Analyze to search entire Indian market.")
 
         if ticker:
             st.session_state['current_ticker'] = ticker
@@ -138,74 +129,74 @@ def main():
         if st.session_state.get('analyze_clicked', False) and ticker:
             em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
             
-            analyzer = ProFinancialAnalyzer(ticker, exchange=em.get(exchange, "Auto"))
-            
-            if not analyzer.get_live_price():
-                st.error("❌ Could not fetch live data. Please try another ticker or check your connection.")
-            else:
-                analyzer.fetch_financial_data()
-                analyzer.calculate_all_ratios()
-
-                pd_d = analyzer.live_price_data
-                cur = analyzer.currency_symbol
-                cp = pd_d.get('current_price')
-                pc = pd_d.get('previous_close')
+            with st.spinner(f"🔍 Fetching data for {ticker}... This may take a few seconds."):
+                analyzer = ProFinancialAnalyzer(ticker, exchange=em.get(exchange, "Auto"))
                 
-                if cp and pc:
-                    ch = cp - pc
-                    ch_pct = (ch/pc)*100
-                    color = "price-up" if ch >= 0 else "price-down"
-                    arrow = "▲" if ch >= 0 else "▼"
-                    st.markdown(f'<div class="live-price-box"><h2>{analyzer.company_name}</h2><div class="{color}">{cur}{cp:.2f} {arrow}</div><div>{cur}{abs(ch):.2f} ({ch_pct:+.2f}%)</div><p style="color:#94a3b8;font-size:0.8rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
-                elif cp:
-                    st.markdown(f'<div class="live-price-box"><h2>{analyzer.company_name}</h2><div style="font-size:3rem;font-weight:900;">{cur}{cp:.2f}</div><p style="color:#94a3b8;font-size:0.8rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
+                if not analyzer.get_live_price():
+                    st.error(f"❌ Could not fetch data for **{ticker}**. Try:\n- Check the ticker spelling\n- Select the correct exchange\n- Wait a moment and retry (rate limits)")
+                else:
+                    analyzer.fetch_financial_data()
+                    analyzer.calculate_all_ratios()
 
-                st.markdown(f'<div class="info-box">📊 {analyzer.company_name} | {analyzer.financials.get("sector","N/A")} | {analyzer.currency} | MCap: {analyzer._format_amount(pd_d.get("market_cap",0))}</div>', unsafe_allow_html=True)
+                    pd_d = analyzer.live_price_data
+                    cur = analyzer.currency_symbol
+                    cp = pd_d.get('current_price')
+                    pc = pd_d.get('previous_close')
+                    
+                    if cp and pc:
+                        ch = cp - pc
+                        ch_pct = (ch/pc)*100
+                        color = "price-up" if ch >= 0 else "price-down"
+                        arrow = "▲" if ch >= 0 else "▼"
+                        st.markdown(f'<div class="live-price-box"><h2>{analyzer.company_name}</h2><div class="{color}">{cur}{cp:.2f} {arrow}</div><div>{cur}{abs(ch):.2f} ({ch_pct:+.2f}%)</div><p style="color:#94a3b8;font-size:0.8rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
+                    elif cp:
+                        st.markdown(f'<div class="live-price-box"><h2>{analyzer.company_name}</h2><div style="font-size:3rem;font-weight:900;">{cur}{cp:.2f}</div><p style="color:#94a3b8;font-size:0.8rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
 
-                ratios = analyzer.ratios
-                if ratios:
-                    st.markdown('<div class="section-header">📊 Key Ratios</div>', unsafe_allow_html=True)
-                    cols = st.columns(5)
-                    for col, (l, v) in zip(cols, [
-                        ('P/E', ratios.get('P/E Ratio')), ('ROE %', ratios.get('ROE')),
-                        ('P/B', ratios.get('P/B Ratio')), ('D/E', ratios.get('Debt to Equity')),
-                        ('Div Yld', ratios.get('Dividend Yield'))
-                    ]):
-                        with col:
-                            if isinstance(v, (int, float)):
-                                d = f"{v:.1f}%" if l in ['ROE %', 'Div Yld'] else f"{v:.2f}"
-                                st.markdown(f'<div class="card"><div class="metric-value">{d}</div><div class="metric-label">{l}</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="info-box">📊 {analyzer.company_name} | {analyzer.financials.get("sector","N/A")} | {analyzer.currency} | MCap: {analyzer._format_amount(pd_d.get("market_cap",0))}</div>', unsafe_allow_html=True)
 
-                create_valuation_dashboard(analyzer)
-                create_advanced_scores_dashboard(analyzer)
-                create_index_comparison_dashboard(analyzer)
-                create_investment_thesis_dashboard(analyzer)
-                create_factor_investing_dashboard(analyzer)
+                    ratios = analyzer.ratios
+                    if ratios:
+                        st.markdown('<div class="section-header">📊 Key Ratios</div>', unsafe_allow_html=True)
+                        cols = st.columns(5)
+                        for col, (l, v) in zip(cols, [
+                            ('P/E', ratios.get('P/E Ratio')), ('ROE %', ratios.get('ROE')),
+                            ('P/B', ratios.get('P/B Ratio')), ('D/E', ratios.get('Debt to Equity')),
+                            ('Div Yld', ratios.get('Dividend Yield'))
+                        ]):
+                            with col:
+                                if isinstance(v, (int, float)):
+                                    d = f"{v:.1f}%" if l in ['ROE %', 'Div Yld'] else f"{v:.2f}"
+                                    st.markdown(f'<div class="card"><div class="metric-value">{d}</div><div class="metric-label">{l}</div></div>', unsafe_allow_html=True)
 
-                group_name, peer_list = detect_peer_group(analyzer.ticker)
-                if peer_list:
-                    with st.spinner("Fetching peers..."):
-                        all_peers = [analyzer.ticker] + [p for p in peer_list if p != analyzer.ticker][:5]
-                        pdf = get_peer_comparison(analyzer.ticker, all_peers)
-                        if not pdf.empty:
-                            st.markdown('<div class="section-header">🏢 Peer Comparison</div>', unsafe_allow_html=True)
-                            st.dataframe(pdf, use_container_width=True, hide_index=True)
+                    create_valuation_dashboard(analyzer)
+                    create_advanced_scores_dashboard(analyzer)
+                    create_index_comparison_dashboard(analyzer)
+                    create_investment_thesis_dashboard(analyzer)
+                    create_factor_investing_dashboard(analyzer)
 
-                st.markdown('<div class="section-header">📋 Financial Statements</div>', unsafe_allow_html=True)
-                t1, t2, t3 = st.tabs(["Income", "Balance", "Cash Flow"])
-                for tab, key in [(t1, 'income'), (t2, 'balance'), (t3, 'cashflow')]:
-                    with tab:
-                        df = analyzer.financials.get(key)
-                        if df is not None and not df.empty:
-                            formatted = format_financial_df(df, analyzer.currency_symbol, analyzer.currency)
-                            if formatted is not None:
-                                st.dataframe(formatted, use_container_width=True)
-                        else:
-                            st.info("Not available.")
+                    group_name, peer_list = detect_peer_group(analyzer.ticker)
+                    if peer_list:
+                        with st.spinner("Fetching peers..."):
+                            all_peers = [analyzer.ticker] + [p for p in peer_list if p != analyzer.ticker][:5]
+                            pdf = get_peer_comparison(analyzer.ticker, all_peers)
+                            if not pdf.empty:
+                                st.markdown('<div class="section-header">🏢 Peer Comparison</div>', unsafe_allow_html=True)
+                                st.dataframe(pdf, use_container_width=True, hide_index=True)
+
+                    st.markdown('<div class="section-header">📋 Financial Statements</div>', unsafe_allow_html=True)
+                    t1, t2, t3 = st.tabs(["Income", "Balance", "Cash Flow"])
+                    for tab, key in [(t1, 'income'), (t2, 'balance'), (t3, 'cashflow')]:
+                        with tab:
+                            df = analyzer.financials.get(key)
+                            if df is not None and not df.empty:
+                                formatted = format_financial_df(df, analyzer.currency_symbol, analyzer.currency)
+                                if formatted is not None:
+                                    st.dataframe(formatted, use_container_width=True)
+                            else:
+                                st.info("Not available.")
         elif not ticker:
-            st.markdown('<div style="text-align:center;padding:4rem;"><h2>🏦 Finshare Pro</h2><p>Type a ticker above and click Analyze</p></div>', unsafe_allow_html=True)
+            st.markdown('<div style="text-align:center;padding:4rem;"><h2>🏦 Finshare Pro</h2><p>Type any ticker above, select exchange, and click Analyze</p><p style="color:#94a3b8;">Works for ALL Indian stocks (.NS) and US stocks</p></div>', unsafe_allow_html=True)
 
-    # ===== TAB 2: STRESS TESTS =====
     with tab2:
         st.markdown("### 🛡️ Stress Tests")
         col1, col2 = st.columns([2, 1])
@@ -218,15 +209,14 @@ def main():
                 st.warning("Please enter a ticker.")
             else:
                 em2 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
-                a2 = ProFinancialAnalyzer(st2_t.strip().upper(), exchange=em2.get(st2_e, "Auto"))
-                with st.spinner("Loading..."):
+                with st.spinner("Running stress tests..."):
+                    a2 = ProFinancialAnalyzer(st2_t.strip().upper(), exchange=em2.get(st2_e, "Auto"))
                     if a2.get_live_price():
                         a2.fetch_financial_data()
                         create_stress_test_dashboard(a2)
                     else:
-                        st.error("Could not fetch data.")
+                        st.error("Could not fetch data. Try again.")
 
-    # ===== TAB 3: TECHNICAL ANALYSIS =====
     with tab3:
         st.markdown("### 📈 Technical Analysis")
         col1, col2 = st.columns([2, 1])
@@ -239,19 +229,17 @@ def main():
                 st.warning("Please enter a ticker.")
             else:
                 em3 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
-                a3 = ProFinancialAnalyzer(ta_t.strip().upper(), exchange=em3.get(ta_e, "Auto"))
                 with st.spinner("Calculating..."):
+                    a3 = ProFinancialAnalyzer(ta_t.strip().upper(), exchange=em3.get(ta_e, "Auto"))
                     if a3.get_live_price():
                         a3.fetch_financial_data()
                         create_technical_dashboard(a3)
                     else:
-                        st.error("Could not fetch data.")
+                        st.error("Could not fetch data. Try again.")
 
-    # ===== TAB 4: PORTFOLIO OPTIMIZER =====
     with tab4:
         create_portfolio_optimization_tab()
 
-    # ===== TAB 5: ADVANCED PORTFOLIO =====
     with tab5:
         create_advanced_portfolio_tab()
 
