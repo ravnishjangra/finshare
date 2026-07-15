@@ -127,22 +127,35 @@ class FactorInvesting:
     
     @staticmethod
     def _calculate_momentum(close):
+        """Momentum factor - handles limited price history gracefully"""
         try:
-            if len(close) < 252:
-                return {'score': 50, 'classification': 'Insufficient Data', 'detail': 'Need 1 year of data', 'color': '#94a3b8'}
+            if close is None or len(close) < 21:
+                return {'score': 50, 'classification': 'No Data', 'detail': 'Need more price history', 'color': '#94a3b8'}
             
             current = close.iloc[-1]
             returns = {}
+            
             for period, days in [('1M', 21), ('3M', 63), ('6M', 126), ('12M', 252)]:
                 if len(close) >= days:
                     past = close.iloc[-days]
-                    returns[period] = ((current - past) / past) * 100
+                    if past and past > 0:
+                        ret = ((current - past) / past) * 100
+                        if not pd.isna(ret):
+                            returns[period] = ret
             
             if not returns:
-                return {'score': 50, 'classification': 'Neutral', 'detail': 'No momentum data', 'color': '#94a3b8'}
+                return {'score': 50, 'classification': 'No Data', 'detail': f'Only {len(close)} days of data', 'color': '#94a3b8'}
             
-            weights = {'1M': 0.15, '3M': 0.25, '6M': 0.30, '12M': 0.30}
-            weighted_return = sum(returns.get(p, 0) * weights.get(p, 0) for p in returns)
+            # Weighted return - normalize based on available data
+            weights = {'1M': 0.25, '3M': 0.35, '6M': 0.25, '12M': 0.15}
+            available_weights = {p: weights.get(p, 0.25) for p in returns}
+            total_weight = sum(available_weights.values())
+            
+            if total_weight > 0:
+                normalized = {p: w/total_weight for p, w in available_weights.items()}
+                weighted_return = sum(returns.get(p, 0) * normalized.get(p, 0) for p in returns)
+            else:
+                weighted_return = sum(returns.values()) / len(returns)
             
             if weighted_return > 50: score = 95
             elif weighted_return > 30: score = 85
@@ -153,6 +166,8 @@ class FactorInvesting:
             elif weighted_return > -30: score = 20
             else: score = 10
             
+            # Trend analysis
+            trend = ''
             if len(close) >= 126:
                 sma50 = close.rolling(50).mean()
                 sma200 = close.rolling(200).mean()
@@ -169,8 +184,12 @@ class FactorInvesting:
                 else:
                     trend = 'Downtrend 📉'
                     score = max(0, score - 10)
-            else:
-                trend = 'N/A'
+            elif len(close) >= 50:
+                sma50 = close.rolling(50).mean()
+                if close.iloc[-1] > sma50.iloc[-1]:
+                    trend = 'Above 50-day MA'
+                else:
+                    trend = 'Below 50-day MA'
             
             if score >= 80: classification, color = 'Strong Momentum', '#10b981'
             elif score >= 60: classification, color = 'Positive', '#34d399'
@@ -178,8 +197,11 @@ class FactorInvesting:
             elif score >= 20: classification, color = 'Negative', '#f97316'
             else: classification, color = 'Weak', '#ef4444'
             
-            detail_parts = [f"{p}: {returns[p]:+.1f}%" for p in ['6M', '12M'] if p in returns]
-            detail_parts.append(trend)
+            detail_parts = [f"{p}: {returns[p]:+.1f}%" for p in ['1M', '3M', '6M', '12M'] if p in returns]
+            if trend:
+                detail_parts.append(trend)
+            if len(close) < 252:
+                detail_parts.append(f'({len(close)} days)')
             
             return {'score': score, 'classification': classification, 'detail': ' | '.join(detail_parts), 'color': color, 'returns': returns}
             
