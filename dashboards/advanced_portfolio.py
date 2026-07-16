@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 from scipy.optimize import minimize
+from theme import COLORS, style_fig
 
 
 class AdvancedPortfolio:
@@ -176,9 +177,9 @@ def create_advanced_portfolio_tab():
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=vols, y=rets, mode='markers+lines',
-                marker=dict(size=4, color=sharpes, colorscale='Viridis', showscale=True,
+                marker=dict(size=4, color=sharpes, colorscale=[[0, COLORS['bg_2']], [0.5, COLORS['accent_1']], [1, COLORS['accent_3']]], showscale=True,
                            colorbar=dict(title='Sharpe')),
-                line=dict(color='#667eea', width=2), name='Efficient Frontier'
+                line=dict(color=COLORS['accent_1'], width=2), name='Efficient Frontier'
             ))
             
             best_idx = np.argmax(sharpes)
@@ -186,18 +187,18 @@ def create_advanced_portfolio_tab():
             
             fig.add_trace(go.Scatter(
                 x=[vols[best_idx]], y=[rets[best_idx]], mode='markers+text',
-                marker=dict(size=20, color='#10b981', symbol='star'),
+                marker=dict(size=20, color=COLORS['up'], symbol='star'),
                 text=['Max Sharpe'], textposition='top center', name='Max Sharpe'
             ))
             fig.add_trace(go.Scatter(
                 x=[vols[min_vol_idx]], y=[rets[min_vol_idx]], mode='markers+text',
-                marker=dict(size=15, color='#f59e0b', symbol='diamond'),
+                marker=dict(size=15, color=COLORS['neutral'], symbol='diamond'),
                 text=['Min Vol'], textposition='top center', name='Min Vol'
             ))
             
             fig.update_layout(xaxis_title='Risk (Volatility %)', yaxis_title='Return (%)',
-                            template='plotly_white', height=450, hovermode='x unified')
-            st.plotly_chart(fig, use_container_width=True)
+                            height=450, hovermode='x unified')
+            st.plotly_chart(style_fig(fig), use_container_width=True)
             st.caption(f"**Max Sharpe**: {rets[best_idx]:.1f}% return, {vols[best_idx]:.1f}% risk, Sharpe {sharpes[best_idx]:.2f}")
         
         # ===== 2. BACKTESTING =====
@@ -217,13 +218,13 @@ def create_advanced_portfolio_tab():
         if not bench_cum.empty:
             fig.add_trace(go.Scatter(
                 x=bench_cum.index, y=bench_cum.values,
-                name=f'{tickers[0]} (Benchmark)', line=dict(width=1, dash='dash', color='gray')
+                name=f'{tickers[0]} (Benchmark)', line=dict(width=1, dash='dash', color=COLORS['text_3'])
             ))
         
         fig.update_layout(title='Portfolio Performance Comparison', xaxis_title='Date',
-                         yaxis_title='Growth of $100', template='plotly_white', height=400,
+                         yaxis_title='Growth of $100', height=400,
                          hovermode='x unified')
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(style_fig(fig), use_container_width=True)
         
         # ===== 3. DRAWDOWN =====
         st.markdown("### 📉 Drawdown Analysis (Max Sharpe)")
@@ -235,21 +236,21 @@ def create_advanced_portfolio_tab():
         
         fig.add_trace(go.Scatter(
             x=cum100.index, y=cum100.values, name='Portfolio Value',
-            line=dict(color='#667eea', width=2)
+            line=dict(color=COLORS['accent_1'], width=2)
         ), row=1, col=1)
         
         fig.add_trace(go.Scatter(
             x=dd_series.index, y=dd_series.values, name='Drawdown %',
-            fill='tozeroy', line=dict(color='#ef4444', width=1),
-            fillcolor='rgba(239,68,68,0.2)'
+            fill='tozeroy', line=dict(color=COLORS['down'], width=1),
+            fillcolor='rgba(255,93,122,0.18)'
         ), row=2, col=1)
         
-        fig.add_hline(y=0, line_color='gray', row=2, col=1)
-        fig.update_layout(title='Max Sharpe Portfolio Drawdown', template='plotly_white',
+        fig.add_hline(y=0, line_color=COLORS['text_3'], row=2, col=1)
+        fig.update_layout(title='Max Sharpe Portfolio Drawdown',
                          height=450, showlegend=False)
         fig.update_yaxes(title_text='Portfolio Value', row=1, col=1)
         fig.update_yaxes(title_text='Drawdown %', row=2, col=1)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(style_fig(fig), use_container_width=True)
         
         max_dd = dd_series.min()
         current_dd = dd_series.iloc[-1]
@@ -267,7 +268,7 @@ def create_advanced_portfolio_tab():
             sims = ap.monte_carlo(w_ms, years=mc_years, sims=5000)
         
         fig = go.Figure()
-        for p, c in zip([5, 25, 50, 75, 95], ['#ef4444', '#f59e0b', '#10b981', '#34d399', '#667eea']):
+        for p, c in zip([5, 25, 50, 75, 95], [COLORS['down'], COLORS['neutral'], COLORS['up'], COLORS['accent_3'], COLORS['accent_1']]):
             path = np.percentile(sims, p, axis=1)
             fig.add_trace(go.Scatter(
                 y=path, mode='lines',
@@ -276,8 +277,8 @@ def create_advanced_portfolio_tab():
             ))
         
         fig.update_layout(title=f'5,000 Simulated Portfolio Paths', xaxis_title='Trading Days',
-                         yaxis_title='Portfolio Value ($)', template='plotly_white', height=400)
-        st.plotly_chart(fig, use_container_width=True)
+                         yaxis_title='Portfolio Value ($)', height=400)
+        st.plotly_chart(style_fig(fig), use_container_width=True)
         
         final_values = sims[-1]
         

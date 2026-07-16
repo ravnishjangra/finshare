@@ -5,6 +5,7 @@ from models.dcf import AdvancedDCF
 from models.graham import GrahamValuation
 from models.epv import EarningsPowerValue
 from models.residual_income import ResidualIncome
+from theme import COLORS, style_fig
 
 def create_valuation_dashboard(analyzer):
     st.markdown('<div class="section-header">💰 Advanced Valuation Models</div>', unsafe_allow_html=True)
@@ -82,9 +83,9 @@ def create_valuation_dashboard(analyzer):
     fcf_vals = [p['fcf']/div for p in result['projections']]
     
     fig = go.Figure()
-    fig.add_trace(go.Bar(x=years, y=fcf_vals, name='FCF', marker_color='#667eea'))
-    fig.update_layout(title=f'10-Year FCF Projection ({cur}{unit})', template='plotly_white', height=350)
-    st.plotly_chart(fig, use_container_width=True)
+    fig.add_trace(go.Bar(x=years, y=fcf_vals, name='FCF', marker_color=COLORS['accent_1']))
+    fig.update_layout(title=f'10-Year FCF Projection ({cur}{unit})', height=350)
+    st.plotly_chart(style_fig(fig), use_container_width=True)
 
     eps = analyzer.ratios.get('EPS', ni/shares if ni and shares else 1)
     graham_val = GrahamValuation.calculate(eps, rg, rf) if eps and eps > 0 else 0
@@ -95,11 +96,11 @@ def create_valuation_dashboard(analyzer):
     fig = go.Figure()
     for model, val in models.items():
         if val and val > 0:
-            color = '#10b981' if val > cp else '#ef4444' if val < cp else '#f59e0b'
+            color = COLORS['up'] if val > cp else COLORS['down'] if val < cp else COLORS['neutral']
             fig.add_trace(go.Bar(x=[model], y=[val], marker_color=color, text=[f"{cur}{val:.2f}"], textposition='outside'))
-    fig.add_hline(y=cp, line_dash="dash", line_color="#94a3b8")
-    fig.update_layout(title='All Valuation Models', template='plotly_white', height=400, showlegend=False)
-    st.plotly_chart(fig, use_container_width=True)
+    fig.add_hline(y=cp, line_dash="dash", line_color=COLORS['text_3'])
+    fig.update_layout(title='All Valuation Models', height=400, showlegend=False)
+    st.plotly_chart(style_fig(fig), use_container_width=True)
 
     # ===== RESIDUAL INCOME VALUATION =====
     st.markdown("### 📊 Residual Income Valuation")

@@ -6,15 +6,20 @@ import requests
 import time
 from config import CURRENCY_SYMBOLS, INDIAN_STOCKS_DB
 
-# ===== GLOBAL TICKER CACHE =====
+# ===== GLOBAL TICKER CACHE (5-min TTL) =====
 _TICKER_CACHE = {}
 
 def _get_cached_ticker(symbol):
-    """Get or create yfinance Ticker - reuse to avoid rate limiting"""
-    if symbol not in _TICKER_CACHE:
-        time.sleep(1.0)
-        _TICKER_CACHE[symbol] = yf.Ticker(symbol)
-    return _TICKER_CACHE[symbol]
+    """Get or create yfinance Ticker - auto-refresh every 5 minutes"""
+    now = time.time()
+    if symbol not in _TICKER_CACHE or (now - _TICKER_CACHE[symbol]['time']) > 300:
+        if symbol not in _TICKER_CACHE:
+            time.sleep(1.0)  # 1 sec delay only for NEW tickers (rate limit protection)
+        _TICKER_CACHE[symbol] = {
+            'ticker': yf.Ticker(symbol),
+            'time': now
+        }
+    return _TICKER_CACHE[symbol]['ticker']
 
 
 class ProFinancialAnalyzer:
@@ -46,12 +51,7 @@ class ProFinancialAnalyzer:
         """Primary source with retry - works for all stocks"""
         for attempt in range(2):
             try:
-                # On retry, force fresh ticker to bypass yfinance internal cache
-                if attempt == 0:
-                    stock = _get_cached_ticker(self.ticker)
-                else:
-                    stock = yf.Ticker(self.ticker)
-                
+                stock = _get_cached_ticker(self.ticker)
                 info = stock.info
                 
                 if not info or not isinstance(info, dict) or len(info) < 3:

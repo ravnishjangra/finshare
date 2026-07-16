@@ -3,6 +3,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
+from theme import COLORS, style_fig
 
 def create_technical_dashboard(analyzer):
     st.markdown('<div class="section-header">📈 Technical Analysis</div>', unsafe_allow_html=True)
@@ -45,19 +46,19 @@ def create_technical_dashboard(analyzer):
     idx = slice(-120, None)
     fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.5,0.25,0.25])
     
-    fig.add_trace(go.Scatter(x=close.index[idx], y=upper.iloc[idx], line=dict(color='gray',width=1,dash='dash'), name='Upper BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=sma20.iloc[idx], line=dict(color='orange',width=1.5), name='20 MA'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=lower.iloc[idx], line=dict(color='gray',width=1,dash='dash'), fill='tonexty', name='Lower BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=close.iloc[idx], line=dict(color='#667eea',width=2), name='Price'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=close.index[idx], y=upper.iloc[idx], line=dict(color=COLORS['text_3'],width=1,dash='dash'), name='Upper BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=close.index[idx], y=sma20.iloc[idx], line=dict(color=COLORS['neutral'],width=1.5), name='20 MA'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=close.index[idx], y=lower.iloc[idx], line=dict(color=COLORS['text_3'],width=1,dash='dash'), fill='tonexty', fillcolor='rgba(109,94,248,0.06)', name='Lower BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=close.index[idx], y=close.iloc[idx], line=dict(color=COLORS['accent_1'],width=2), name='Price'), row=1, col=1)
     
-    fig.add_trace(go.Scatter(x=rsi.index[idx], y=rsi.iloc[idx], line=dict(color='#667eea',width=2), name='RSI'), row=2, col=1)
-    fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-    fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+    fig.add_trace(go.Scatter(x=rsi.index[idx], y=rsi.iloc[idx], line=dict(color=COLORS['accent_3'],width=2), name='RSI'), row=2, col=1)
+    fig.add_hline(y=70, line_dash="dash", line_color=COLORS['down'], row=2, col=1)
+    fig.add_hline(y=30, line_dash="dash", line_color=COLORS['up'], row=2, col=1)
     
-    fig.add_trace(go.Scatter(x=macd.index[idx], y=macd.iloc[idx], line=dict(color='#667eea',width=2), name='MACD'), row=3, col=1)
-    fig.add_trace(go.Scatter(x=signal.index[idx], y=signal.iloc[idx], line=dict(color='#f59e0b',width=1.5), name='Signal'), row=3, col=1)
-    colors = ['#10b981' if h >= 0 else '#ef4444' for h in hist.iloc[idx]]
+    fig.add_trace(go.Scatter(x=macd.index[idx], y=macd.iloc[idx], line=dict(color=COLORS['accent_1'],width=2), name='MACD'), row=3, col=1)
+    fig.add_trace(go.Scatter(x=signal.index[idx], y=signal.iloc[idx], line=dict(color=COLORS['neutral'],width=1.5), name='Signal'), row=3, col=1)
+    colors = [COLORS['up'] if h >= 0 else COLORS['down'] for h in hist.iloc[idx]]
     fig.add_trace(go.Bar(x=hist.index[idx], y=hist.iloc[idx], marker_color=colors, name='Histogram'), row=3, col=1)
     
-    fig.update_layout(height=750, template='plotly_white', hovermode='x unified')
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(height=750, hovermode='x unified')
+    st.plotly_chart(style_fig(fig), use_container_width=True)

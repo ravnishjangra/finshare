@@ -2,6 +2,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 from analytics.index_compare import IndexComparison
+from theme import COLORS, style_fig
 
 def create_index_comparison_dashboard(analyzer):
     st.markdown('<div class="section-header">📊 Index & Sector Comparison</div>', unsafe_allow_html=True)
@@ -27,7 +28,7 @@ def create_index_comparison_dashboard(analyzer):
         col4.metric("Beta", f"{comp['beta']:.2f}")
         
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=comp['stock_cumulative'].index, y=comp['stock_cumulative'].values, name=analyzer.company_name[:20], line=dict(color='#667eea', width=3)))
-        fig.add_trace(go.Scatter(x=comp['benchmark_cumulative'].index, y=comp['benchmark_cumulative'].values, name=benchmark_name, line=dict(color='#94a3b8', width=2, dash='dash')))
-        fig.update_layout(title=f'Total Return Comparison • {selected}', template='plotly_white', height=500)
-        st.plotly_chart(fig, use_container_width=True)
+        fig.add_trace(go.Scatter(x=comp['stock_cumulative'].index, y=comp['stock_cumulative'].values, name=analyzer.company_name[:20], line=dict(color=COLORS['accent_1'], width=3)))
+        fig.add_trace(go.Scatter(x=comp['benchmark_cumulative'].index, y=comp['benchmark_cumulative'].values, name=benchmark_name, line=dict(color=COLORS['text_3'], width=2, dash='dash')))
+        fig.update_layout(title=f'Total Return Comparison • {selected}', height=500)
+        st.plotly_chart(style_fig(fig), use_container_width=True)

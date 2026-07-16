@@ -20,174 +20,229 @@ st.set_page_config(page_title="Finshare Pro", page_icon="📊", layout="wide")
 
 st.markdown("""
 <style>
-    /* ===== GLOBAL ===== */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    /* ============================================================
+       DESIGN TOKENS
+       ============================================================ */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+
+    :root {
+        --bg-0: #05070d;
+        --bg-1: #0a0e17;
+        --bg-2: #10141f;
+        --surface: #131826;
+        --surface-hover: #171d2e;
+        --border: rgba(148, 163, 253, 0.10);
+        --border-strong: rgba(148, 163, 253, 0.22);
+
+        --accent-1: #6d5ef8;
+        --accent-2: #9b6bf5;
+        --accent-3: #4fd1ff;
+        --accent-grad: linear-gradient(135deg, #6d5ef8 0%, #9b6bf5 45%, #4fd1ff 100%);
+
+        --up: #22d38f;
+        --up-glow: rgba(34, 211, 143, 0.25);
+        --down: #ff5d7a;
+        --down-glow: rgba(255, 93, 122, 0.25);
+
+        --text-1: #f4f6fb;
+        --text-2: #aab1c5;
+        --text-3: #6b7488;
+
+        --radius-lg: 18px;
+        --radius-md: 12px;
+        --radius-sm: 8px;
+        --shadow-lift: 0 18px 40px rgba(3, 5, 12, 0.55);
+    }
+
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    
-    /* ===== HEADERS ===== */
-    .main-header { 
-        font-size: 3rem; font-weight: 900; text-align: center; margin-bottom: 0.3rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 40%, #f093fb 100%);
+    .stApp { background: radial-gradient(ellipse 120% 80% at 50% -10%, #131a30 0%, var(--bg-0) 55%); }
+
+    /* ===== HEADER ===== */
+    .app-header { text-align: center; margin-bottom: 0.25rem; padding-top: 0.5rem; }
+    .app-badge {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: rgba(109, 94, 248, 0.10); border: 1px solid var(--border-strong);
+        color: var(--accent-3); font-size: 0.72rem; font-weight: 700; letter-spacing: 1.4px;
+        text-transform: uppercase; padding: 0.3rem 0.9rem; border-radius: 999px; margin-bottom: 1rem;
+    }
+    .main-header {
+        font-size: 3.1rem; font-weight: 900; text-align: center; margin-bottom: 0.4rem;
+        background: var(--accent-grad);
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        letter-spacing: -0.5px;
+        letter-spacing: -1.2px; line-height: 1.05;
     }
-    .sub-header { 
-        font-size: 0.95rem; color: #94a3b8; text-align: center; margin-bottom: 2.5rem; 
-        letter-spacing: 0.5px;
+    .sub-header {
+        font-size: 0.97rem; color: var(--text-2); text-align: center; margin-bottom: 2.75rem;
+        letter-spacing: 0.3px; font-weight: 500;
     }
-    
+    .sub-header .dot { color: var(--accent-3); margin: 0 0.5rem; }
+
     /* ===== CARDS ===== */
-    .card { 
-        background: linear-gradient(145deg, #1e293b, #0f172a); 
-        border: 1px solid rgba(102,126,234,0.12); 
-        padding: 1.3rem; border-radius: 14px; 
-        transition: all 0.25s ease;
+    .card {
+        background: linear-gradient(160deg, var(--surface) 0%, var(--bg-2) 100%);
+        border: 1px solid var(--border);
+        padding: 1.35rem 1.3rem; border-radius: var(--radius-lg);
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative; overflow: hidden;
     }
     .card::before {
         content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-        background: linear-gradient(90deg, transparent, rgba(102,126,234,0.3), transparent);
-        opacity: 0; transition: opacity 0.25s;
+        background: var(--accent-grad); opacity: 0; transition: opacity 0.25s;
     }
-    .card:hover { 
-        transform: translateY(-2px); 
-        box-shadow: 0 12px 30px rgba(0,0,0,0.3), 0 0 0 1px rgba(102,126,234,0.2);
+    .card:hover {
+        transform: translateY(-3px);
+        border-color: var(--border-strong);
+        box-shadow: var(--shadow-lift), 0 0 0 1px rgba(109, 94, 248, 0.15);
     }
     .card:hover::before { opacity: 1; }
-    .metric-value { font-size: 1.7rem; font-weight: 700; color: #f1f5f9; line-height: 1.2; }
-    .metric-label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-top: 0.3rem; }
-    
+    .metric-value { font-size: 1.75rem; font-weight: 800; color: var(--text-1); line-height: 1.2; font-variant-numeric: tabular-nums; }
+    .metric-label { font-size: 0.68rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 1.3px; margin-top: 0.35rem; font-weight: 600; }
+
     /* ===== LIVE PRICE ===== */
-    .live-price-box { 
-        background: linear-gradient(135deg, #0f172a 0%, #1a1f3a 50%, #0f172a 100%); 
-        border: 2px solid rgba(102,126,234,0.25); 
-        padding: 2rem; border-radius: 20px; 
-        color: white; text-align: center; 
-        box-shadow: 0 20px 50px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+    .live-price-box {
+        background: linear-gradient(160deg, #10121e 0%, #171a30 55%, #0e1120 100%);
+        border: 1px solid var(--border-strong);
+        padding: 2.2rem 2rem; border-radius: 22px;
+        color: white; text-align: center;
+        box-shadow: var(--shadow-lift), inset 0 1px 0 rgba(255,255,255,0.04);
+        position: relative; overflow: hidden;
     }
-    .price-up { color: #10b981; font-size: 3rem; font-weight: 900; text-shadow: 0 0 40px rgba(16,185,129,0.2); }
-    .price-down { color: #ef4444; font-size: 3rem; font-weight: 900; text-shadow: 0 0 40px rgba(239,68,68,0.2); }
-    .company-name { font-size: 1.3rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.5rem; }
-    .price-change { font-size: 1.1rem; font-weight: 500; margin-top: 0.3rem; }
-    
+    .live-price-box::after {
+        content: ''; position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(circle at 50% 0%, rgba(109,94,248,0.14), transparent 60%);
+    }
+    .price-up { color: var(--up); font-size: 3.1rem; font-weight: 900; text-shadow: 0 0 50px var(--up-glow); letter-spacing: -1px; }
+    .price-down { color: var(--down); font-size: 3.1rem; font-weight: 900; text-shadow: 0 0 50px var(--down-glow); letter-spacing: -1px; }
+    .company-name { font-size: 1.35rem; font-weight: 700; color: var(--text-1); margin-bottom: 0.6rem; letter-spacing: -0.2px; }
+    .price-change {
+        font-size: 1.02rem; font-weight: 700; margin-top: 0.5rem;
+        display: inline-flex; padding: 0.25rem 0.8rem; border-radius: 999px;
+    }
+    .source-tag { color: var(--text-3); font-size: 0.72rem; margin-top: 0.9rem; letter-spacing: 0.3px; }
+
     /* ===== SECTION HEADERS ===== */
-    .section-header { 
-        font-size: 1.25rem; font-weight: 700; color: #f1f5f9; 
-        margin: 2.5rem 0 1rem 0; padding-bottom: 0.6rem;
-        border-bottom: 2px solid rgba(102,126,234,0.2);
-        display: flex; align-items: center; gap: 0.6rem;
+    .section-header {
+        font-size: 1.28rem; font-weight: 800; color: var(--text-1);
+        margin: 2.75rem 0 1.1rem 0; padding-bottom: 0.7rem;
+        border-bottom: 1px solid var(--border);
+        display: flex; align-items: center; gap: 0.65rem; letter-spacing: -0.3px;
     }
-    
+    .section-header::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-strong), transparent); }
+
+    /* ===== INFO BOX ===== */
+    .info-box {
+        background: linear-gradient(135deg, var(--surface), #101426);
+        padding: 1rem 1.4rem; border-radius: var(--radius-md);
+        color: var(--text-1); margin: 0.9rem 0;
+        border-left: 3px solid var(--accent-1);
+        font-size: 0.92rem; font-weight: 500;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+
     /* ===== BUTTONS ===== */
-    .stButton button { 
-        width: 100%; border-radius: 10px; padding: 0.5rem 1.2rem; 
-        font-weight: 600; font-size: 0.9rem; letter-spacing: 0.3px;
-        background: linear-gradient(135deg, #667eea, #764ba2); 
+    .stButton button {
+        width: 100%; border-radius: var(--radius-sm); padding: 0.55rem 1.2rem;
+        font-weight: 700; font-size: 0.9rem; letter-spacing: 0.2px;
+        background: var(--accent-grad);
         color: white; border: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative; overflow: hidden;
+        box-shadow: 0 4px 14px rgba(109, 94, 248, 0.25);
     }
     .stButton button::after {
         content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
         transition: left 0.5s;
     }
-    .stButton button:hover { 
-        transform: translateY(-1px); 
-        box-shadow: 0 8px 25px rgba(102,126,234,0.35); 
+    .stButton button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 28px rgba(109, 94, 248, 0.4);
     }
     .stButton button:hover::after { left: 100%; }
-    
+    .stButton button:active { transform: translateY(0); }
+
     /* ===== INPUTS ===== */
-    .stTextInput input, .stSelectbox select {
-        border-radius: 10px !important; border: 1px solid rgba(102,126,234,0.2) !important;
-        background: #1e293b !important; color: #e2e8f0 !important;
-        transition: border-color 0.3s !important;
+    .stTextInput input, .stSelectbox > div > div {
+        border-radius: var(--radius-sm) !important; border: 1px solid var(--border) !important;
+        background: var(--surface) !important; color: var(--text-1) !important;
+        transition: border-color 0.25s, box-shadow 0.25s !important;
     }
-    .stTextInput input:focus, .stSelectbox select:focus {
-        border-color: #667eea !important; box-shadow: 0 0 0 2px rgba(102,126,234,0.15) !important;
+    .stTextInput input:focus {
+        border-color: var(--accent-1) !important; box-shadow: 0 0 0 3px rgba(109,94,248,0.15) !important;
     }
-    
-    /* ===== INFO BOX ===== */
-    .info-box { 
-        background: linear-gradient(135deg, #1e293b, #162032); 
-        padding: 0.9rem 1.3rem; border-radius: 12px; 
-        color: #e2e8f0; margin: 0.8rem 0; 
-        border-left: 3px solid #667eea;
-        font-size: 0.9rem; font-weight: 500;
-    }
-    
+
     /* ===== TABS ===== */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 0.5rem; background: #0f172a; 
-        padding: 0.5rem; border-radius: 14px;
-        border: 1px solid rgba(102,126,234,0.1);
+        gap: 0.4rem; background: var(--bg-1);
+        padding: 0.45rem; border-radius: 16px;
+        border: 1px solid var(--border);
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 10px; padding: 0.6rem 1.2rem;
-        font-weight: 500; color: #94a3b8; font-size: 0.9rem;
-        transition: all 0.3s;
+        border-radius: var(--radius-sm); padding: 0.65rem 1.3rem;
+        font-weight: 600; color: var(--text-2); font-size: 0.9rem;
+        transition: all 0.25s;
     }
+    .stTabs [data-baseweb="tab"]:hover { color: var(--text-1); background: var(--surface-hover); }
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #667eea, #764ba2) !important;
-        color: white !important; font-weight: 600;
-        box-shadow: 0 4px 12px rgba(102,126,234,0.3);
+        background: var(--accent-grad) !important;
+        color: white !important; font-weight: 700;
+        box-shadow: 0 6px 18px rgba(109,94,248,0.35);
     }
-    
-    /* ===== METRICS ===== */
-    [data-testid="stMetricValue"] { font-weight: 700; color: #f1f5f9; }
-    [data-testid="stMetricDelta"] { font-weight: 600; }
-    
+
+    /* ===== METRICS (native) ===== */
+    [data-testid="stMetricValue"] { font-weight: 800; color: var(--text-1); font-variant-numeric: tabular-nums; }
+    [data-testid="stMetricDelta"] { font-weight: 700; }
+    [data-testid="stMetricLabel"] { color: var(--text-3); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 1px; }
+
     /* ===== EXPANDERS ===== */
     .streamlit-expanderHeader {
-        background: #1e293b; border-radius: 10px !important;
-        font-weight: 600; font-size: 0.9rem; color: #e2e8f0 !important;
-        border: 1px solid rgba(102,126,234,0.15) !important;
+        background: var(--surface); border-radius: var(--radius-sm) !important;
+        font-weight: 700; font-size: 0.9rem; color: var(--text-1) !important;
+        border: 1px solid var(--border) !important;
     }
-    .streamlit-expanderHeader:hover { border-color: #667eea !important; }
-    
+    .streamlit-expanderHeader:hover { border-color: var(--border-strong) !important; }
+
     /* ===== DATAFRAMES ===== */
-    [data-testid="stDataFrame"] { 
-        border-radius: 12px; overflow: hidden; 
-        border: 1px solid rgba(102,126,234,0.1);
+    [data-testid="stDataFrame"] {
+        border-radius: var(--radius-md); overflow: hidden;
+        border: 1px solid var(--border);
     }
-    
-    /* ===== SUGGESTIONS ===== */
-    .suggestion-grid {
-        display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;
-    }
-    
+
     /* ===== ANIMATIONS ===== */
     @keyframes fadeInUp {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
-    .animate-in { animation: fadeInUp 0.4s ease-out; }
-    
-    @keyframes shimmer {
-        0% { background-position: -200px 0; }
-        100% { background-position: 200px 0; }
-    }
-    
+    .animate-in { animation: fadeInUp 0.45s cubic-bezier(0.4, 0, 0.2, 1) backwards; }
+    .animate-in:nth-child(1) { animation-delay: 0.02s; }
+    .animate-in:nth-child(2) { animation-delay: 0.06s; }
+    .animate-in:nth-child(3) { animation-delay: 0.10s; }
+    .animate-in:nth-child(4) { animation-delay: 0.14s; }
+    .animate-in:nth-child(5) { animation-delay: 0.18s; }
+
     /* ===== SCROLLBAR ===== */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0f172a; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    
-    /* ===== DIVIDER ===== */
-    hr { border-color: rgba(102,126,234,0.1) !important; margin: 2rem 0 !important; }
-    
-    /* ===== WARNINGS/ERRORS ===== */
-    .stAlert { border-radius: 10px !important; border: none !important; }
-    
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: var(--bg-1); }
+    ::-webkit-scrollbar-thumb { background: #2a3145; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a4258; }
+
+    hr { border-color: var(--border) !important; margin: 2.25rem 0 !important; }
+
+    .stAlert { border-radius: var(--radius-sm) !important; border: 1px solid var(--border) !important; }
+
     /* ===== EMPTY STATE ===== */
-    .empty-state { 
-        text-align: center; padding: 4rem 2rem; 
-        background: linear-gradient(135deg, #1e293b, #0f172a);
-        border-radius: 20px; border: 1px dashed rgba(102,126,234,0.2);
+    .empty-state {
+        text-align: center; padding: 4.5rem 2rem;
+        background: linear-gradient(160deg, var(--surface) 0%, var(--bg-1) 100%);
+        border-radius: 24px; border: 1px dashed var(--border-strong);
+        margin-top: 1rem;
     }
-    .empty-state h2 { color: #e2e8f0; margin-bottom: 0.5rem; }
-    .empty-state p { color: #94a3b8; font-size: 1rem; }
+    .empty-state .icon { font-size: 2.6rem; margin-bottom: 0.75rem; }
+    .empty-state h2 { color: var(--text-1); margin-bottom: 0.5rem; font-weight: 800; }
+    .empty-state p { color: var(--text-2); font-size: 1rem; margin: 0.2rem 0; }
+    .empty-state .muted { color: var(--text-3); font-size: 0.85rem; }
+
+    /* ===== FOOTER ===== */
+    .app-footer { text-align: center; color: var(--text-3); font-size: 0.78rem; letter-spacing: 0.3px; padding-bottom: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -204,8 +259,13 @@ def get_all_stocks():
 ALL_STOCKS = get_all_stocks()
 
 def main():
-    st.markdown('<h1 class="main-header">📊 Finshare Pro</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">DCF Valuation • Factor Investing • Risk Models • Portfolio Analytics • Monte Carlo</p>', unsafe_allow_html=True)
+    st.markdown('''
+        <div class="app-header">
+            <div class="app-badge">⚡ Live Market Intelligence</div>
+            <h1 class="main-header">📊 Finshare Pro</h1>
+            <p class="sub-header">DCF Valuation <span class="dot">•</span> Factor Investing <span class="dot">•</span> Risk Models <span class="dot">•</span> Portfolio Analytics <span class="dot">•</span> Monte Carlo</p>
+        </div>
+    ''', unsafe_allow_html=True)
 
     if 'current_ticker' not in st.session_state:
         st.session_state['current_ticker'] = "AAPL"
@@ -300,9 +360,11 @@ def main():
                             ch_pct = (ch/pc)*100
                             color = "price-up" if ch >= 0 else "price-down"
                             arrow = "▲" if ch >= 0 else "▼"
-                            st.markdown(f'<div class="live-price-box"><div class="company-name">{analyzer.company_name}</div><div class="{color}">{cur}{cp:.2f} <span style="font-size:1.5rem;">{arrow}</span></div><div class="price-change" style="color:{"#10b981" if ch>=0 else "#ef4444"}">{cur}{abs(ch):.2f} ({ch_pct:+.2f}%)</div><p style="color:#64748b;font-size:0.75rem;margin-top:0.5rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
+                            chip_bg = "rgba(34,211,143,0.12)" if ch >= 0 else "rgba(255,93,122,0.12)"
+                            chip_color = "#22d38f" if ch >= 0 else "#ff5d7a"
+                            st.markdown(f'<div class="live-price-box"><div class="company-name">{analyzer.company_name}</div><div class="{color}">{cur}{cp:.2f} <span style="font-size:1.6rem;">{arrow}</span></div><div class="price-change" style="background:{chip_bg};color:{chip_color};">{cur}{abs(ch):.2f} ({ch_pct:+.2f}%)</div><p class="source-tag">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
                         elif cp:
-                            st.markdown(f'<div class="live-price-box"><div class="company-name">{analyzer.company_name}</div><div style="font-size:3rem;font-weight:900;">{cur}{cp:.2f}</div><p style="color:#64748b;font-size:0.75rem;margin-top:0.5rem;">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="live-price-box"><div class="company-name">{analyzer.company_name}</div><div style="font-size:3.1rem;font-weight:900;color:#f4f6fb;">{cur}{cp:.2f}</div><p class="source-tag">Source: {analyzer.data_source}</p></div>', unsafe_allow_html=True)
 
                         st.markdown(f'<div class="info-box">📊 <b>{analyzer.company_name}</b> • {analyzer.financials.get("sector","N/A")} • {analyzer.currency} • MCap: {analyzer._format_amount(pd_d.get("market_cap",0))}</div>', unsafe_allow_html=True)
 
@@ -351,9 +413,10 @@ def main():
                     st.error(f"❌ Error: {str(e)[:100]}. Please try again.")
         elif not st.session_state.get('analyze_clicked'):
             st.markdown('''<div class="empty-state">
-                <h2>🏦 Welcome to Finshare Pro</h2>
+                <div class="icon">🏦</div>
+                <h2>Welcome to Finshare Pro</h2>
                 <p>Type any ticker above, select exchange, and click Analyze</p>
-                <p style="color:#64748b;font-size:0.9rem;">Works for ALL Indian stocks (.NS) and US stocks</p>
+                <p class="muted">Works for ALL Indian stocks (.NS) and US stocks</p>
             </div>''', unsafe_allow_html=True)
 
     with tab2:
@@ -409,7 +472,7 @@ def main():
         create_advanced_portfolio_tab()
 
     st.divider()
-    st.caption(f"Finshare Pro | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    st.markdown(f'<div class="app-footer">Finshare Pro &nbsp;•&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

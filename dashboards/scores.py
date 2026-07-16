@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 from models.piotroski import PiotroskiFScore
 from models.altman import AltmanZScore
+from theme import COLORS, style_fig
 
 def create_advanced_scores_dashboard(analyzer):
     st.markdown('<div class="section-header">🔬 Financial Strength Scores</div>', unsafe_allow_html=True)
@@ -25,27 +26,28 @@ def create_advanced_scores_dashboard(analyzer):
         f_score = PiotroskiFScore.calculate(income, balance, cashflow)
         
         score = f_score.get('score', 0)
-        score_color = f_score.get('color', '#94a3b8')
+        score_color = f_score.get('color', COLORS['text_2'])
         rating = f_score.get('rating', 'N/A')
         
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=score,
             number={'font': {'color': score_color, 'size': 48}},
-            title={'text': "Piotroski F-Score", 'font': {'size': 14}},
+            title={'text': "Piotroski F-Score", 'font': {'size': 14, 'color': COLORS['text_2']}},
             gauge={
-                'axis': {'range': [0, 9], 'tickwidth': 1},
+                'axis': {'range': [0, 9], 'tickwidth': 1, 'tickcolor': COLORS['text_3']},
                 'bar': {'color': score_color, 'thickness': 0.2},
+                'bgcolor': COLORS['bg_2'],
                 'steps': [
-                    {'range': [0, 3], 'color': "rgba(239,68,68,0.15)"},
-                    {'range': [3, 6], 'color': "rgba(245,158,11,0.15)"},
-                    {'range': [6, 9], 'color': "rgba(16,185,129,0.15)"}
+                    {'range': [0, 3], 'color': "rgba(255,93,122,0.15)"},
+                    {'range': [3, 6], 'color': "rgba(245,185,66,0.15)"},
+                    {'range': [6, 9], 'color': "rgba(34,211,143,0.15)"}
                 ],
                 'threshold': {'line': {'color': score_color, 'width': 3}, 'thickness': 0.8, 'value': score}
             }
         ))
         fig.update_layout(height=220, margin=dict(t=30, b=0, l=20, r=20))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(style_fig(fig), use_container_width=True)
         
         st.markdown(f"<h3 style='text-align:center; color:{score_color};'>{rating}</h3>", unsafe_allow_html=True)
         
@@ -68,18 +70,18 @@ def create_advanced_scores_dashboard(analyzer):
                         status = item['status']
                         if status == 'pass':
                             icon = '✅'
-                            color = '#10b981'
+                            color = COLORS['up']
                         elif status == 'fail':
                             icon = '❌'
-                            color = '#ef4444'
+                            color = COLORS['down']
                         else:
                             icon = '⬜'
-                            color = '#94a3b8'
+                            color = COLORS['text_2']
                         
                         st.markdown(
                             f"<span style='color:{color};font-size:1.1rem;'>{icon}</span> "
-                            f"<span style='color:#e2e8f0;'>{item['name']}</span> "
-                            f"<span style='color:#94a3b8;font-size:0.8rem;'>— {item['detail']}</span>",
+                            f"<span style='color:{COLORS['text_1']};'>{item['name']}</span> "
+                            f"<span style='color:{COLORS['text_3']};font-size:0.8rem;'>— {item['detail']}</span>",
                             unsafe_allow_html=True
                         )
                     st.markdown("")
@@ -106,20 +108,21 @@ def create_advanced_scores_dashboard(analyzer):
                 mode="gauge+number",
                 value=z,
                 number={'font': {'color': z_color, 'size': 48}},
-                title={'text': "Altman Z-Score", 'font': {'size': 14}},
+                title={'text': "Altman Z-Score", 'font': {'size': 14, 'color': COLORS['text_2']}},
                 gauge={
-                    'axis': {'range': [0, 6], 'tickwidth': 1},
+                    'axis': {'range': [0, 6], 'tickwidth': 1, 'tickcolor': COLORS['text_3']},
                     'bar': {'color': z_color, 'thickness': 0.2},
+                    'bgcolor': COLORS['bg_2'],
                     'steps': [
-                        {'range': [0, 1.81], 'color': "rgba(239,68,68,0.15)"},
-                        {'range': [1.81, 2.99], 'color': "rgba(245,158,11,0.15)"},
-                        {'range': [2.99, 6], 'color': "rgba(16,185,129,0.15)"}
+                        {'range': [0, 1.81], 'color': "rgba(255,93,122,0.15)"},
+                        {'range': [1.81, 2.99], 'color': "rgba(245,185,66,0.15)"},
+                        {'range': [2.99, 6], 'color': "rgba(34,211,143,0.15)"}
                     ],
                     'threshold': {'line': {'color': z_color, 'width': 3}, 'thickness': 0.8, 'value': z}
                 }
             ))
             fig.update_layout(height=220, margin=dict(t=30, b=0, l=20, r=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(style_fig(fig), use_container_width=True)
             
             st.markdown(f"<h3 style='text-align:center; color:{z_color};'>{zone}</h3>", unsafe_allow_html=True)
             
@@ -140,7 +143,7 @@ def create_advanced_scores_dashboard(analyzer):
                         val = comp_data['value']
                         weight = comp_data['weight']
                         signal = comp_data['signal']
-                        val_color = '#10b981' if val > 0 else '#ef4444'
+                        val_color = COLORS['up'] if val > 0 else COLORS['down']
                         st.markdown(f"**{comp_name}** = <span style='color:{val_color}'>{val:.3f}</span> × {weight} → *{signal}*", unsafe_allow_html=True)
         else:
             st.warning("Insufficient data for Z-Score calculation.")

@@ -1,4 +1,4 @@
-"""Portfolio Optimization Tab - 6 Strategy Comparison"""
+""""Portfolio Optimization Tab - 6 Strategy Comparison"""
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -7,6 +7,7 @@ import yfinance as yf
 from scipy.optimize import minimize
 from analytics.portfolio import PortfolioOptimizer
 from models.max_diversification import MaxDiversification
+from theme import COLORS, style_fig
 
 def create_portfolio_optimization_tab():
     st.markdown('<div class="section-header">🎯 Portfolio Strategy Comparison</div>', unsafe_allow_html=True)
@@ -97,12 +98,12 @@ def create_portfolio_optimization_tab():
             w6 = md['weights']
             
             strategies = [
-                {'name': 'Equal Weight', 'weights': dict(zip(tickers, w1)), 'return': port_return(w1), 'volatility': port_vol(w1), 'sharpe': port_sharpe(w1), 'color': '#94a3b8'},
-                {'name': 'Max Sharpe', 'weights': dict(zip(tickers, w2)), 'return': port_return(w2), 'volatility': port_vol(w2), 'sharpe': port_sharpe(w2), 'color': '#667eea'},
-                {'name': 'Min Volatility', 'weights': dict(zip(tickers, w3)), 'return': port_return(w3), 'volatility': port_vol(w3), 'sharpe': port_sharpe(w3), 'color': '#f59e0b'},
-                {'name': 'Risk Parity', 'weights': dict(zip(tickers, w4)), 'return': port_return(w4), 'volatility': port_vol(w4), 'sharpe': port_sharpe(w4), 'color': '#10b981'},
-                {'name': 'Black-Litterman', 'weights': dict(zip(tickers, w5)), 'return': port_return(w5), 'volatility': port_vol(w5), 'sharpe': port_sharpe(w5), 'color': '#f093fb'},
-                {'name': 'Max Diversification', 'weights': dict(zip(tickers, w6.round(4))), 'return': port_return(w6), 'volatility': port_vol(w6), 'sharpe': port_sharpe(w6), 'color': '#8b5cf6'},
+                {'name': 'Equal Weight', 'weights': dict(zip(tickers, w1)), 'return': port_return(w1), 'volatility': port_vol(w1), 'sharpe': port_sharpe(w1), 'color': COLORS['text_2']},
+                {'name': 'Max Sharpe', 'weights': dict(zip(tickers, w2)), 'return': port_return(w2), 'volatility': port_vol(w2), 'sharpe': port_sharpe(w2), 'color': COLORS['accent_1']},
+                {'name': 'Min Volatility', 'weights': dict(zip(tickers, w3)), 'return': port_return(w3), 'volatility': port_vol(w3), 'sharpe': port_sharpe(w3), 'color': COLORS['neutral']},
+                {'name': 'Risk Parity', 'weights': dict(zip(tickers, w4)), 'return': port_return(w4), 'volatility': port_vol(w4), 'sharpe': port_sharpe(w4), 'color': COLORS['up']},
+                {'name': 'Black-Litterman', 'weights': dict(zip(tickers, w5)), 'return': port_return(w5), 'volatility': port_vol(w5), 'sharpe': port_sharpe(w5), 'color': '#c084fc'},
+                {'name': 'Max Diversification', 'weights': dict(zip(tickers, w6.round(4))), 'return': port_return(w6), 'volatility': port_vol(w6), 'sharpe': port_sharpe(w6), 'color': COLORS['accent_2']},
             ]
         
         # ===== PIE CHARTS =====
@@ -114,10 +115,10 @@ def create_portfolio_optimization_tab():
                 fig = go.Figure(data=[go.Pie(
                     labels=list(strat['weights'].keys()), values=list(strat['weights'].values()),
                     hole=0.5, textinfo='label+percent',
-                    marker=dict(colors=[strat['color']] + ['#334155']*10)
+                    marker=dict(colors=[strat['color']] + ['#232a3d']*10, line=dict(color=COLORS['bg_1'], width=1))
                 )])
                 fig.update_layout(height=250, margin=dict(t=0,b=0,l=10,r=10), showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(style_fig(fig), use_container_width=True)
         
         # ===== COMPARISON TABLE =====
         st.markdown("### 📈 Performance Comparison")
@@ -141,8 +142,8 @@ def create_portfolio_optimization_tab():
                 textfont=dict(size=10)
             ))
         fig.update_layout(xaxis_title='Risk (Volatility %)', yaxis_title='Return (%)',
-                          template='plotly_white', height=400, showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
+                          height=400, showlegend=False)
+        st.plotly_chart(style_fig(fig), use_container_width=True)
         
         # ===== HEATMAP =====
         st.markdown("### 🔥 Weight Allocation Heatmap")
@@ -153,12 +154,13 @@ def create_portfolio_optimization_tab():
         
         fig = go.Figure(data=go.Heatmap(
             z=hm_df.values, x=hm_df.columns, y=hm_df.index,
-            colorscale='Blues', text=np.round(hm_df.values, 1),
-            texttemplate='%{text:.1f}%', textfont={"size":11},
+            colorscale=[[0, COLORS['bg_2']], [0.5, COLORS['accent_1']], [1, COLORS['accent_3']]],
+            text=np.round(hm_df.values, 1),
+            texttemplate='%{text:.1f}%', textfont={"size":11, "color": COLORS['text_1']},
             showscale=True, colorbar=dict(title='Weight %')
         ))
-        fig.update_layout(height=300, template='plotly_white')
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_layout(height=300)
+        st.plotly_chart(style_fig(fig), use_container_width=True)
         
         # ===== KEY TAKEAWAY =====
         best = max(strategies, key=lambda x: x['sharpe'])

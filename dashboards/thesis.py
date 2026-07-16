@@ -1,6 +1,7 @@
 """AI Investment Thesis Dashboard - BULLETPROOF"""
 import streamlit as st
 from models.dcf import AdvancedDCF
+from theme import COLORS
 
 def safe_float(val, default=0):
     """Safely convert to float"""
@@ -136,9 +137,9 @@ def create_investment_thesis_dashboard(analyzer):
     
     thesis = generate_investment_thesis(analyzer, dcf_result)
     score_pct = thesis.get('score_pct', 0) or 0
-    score_color = "#10b981" if score_pct >= 75 else "#f59e0b" if score_pct >= 50 else "#ef4444"
+    score_color = COLORS['up'] if score_pct >= 75 else COLORS['neutral'] if score_pct >= 50 else COLORS['down']
     
-    st.markdown(f'<div style="background:#1e293b;border:2px solid {score_color};padding:1.5rem;border-radius:16px;margin-bottom:1rem;"><div style="display:flex;justify-content:space-between;"><h3>📝 {analyzer.company_name}</h3><span style="font-size:1.5rem;font-weight:900;color:{score_color};">{thesis.get("score", "N/A")}</span></div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="background:linear-gradient(160deg,{COLORS["surface"]},{COLORS["bg_2"]});border:1px solid {score_color}55;border-left:3px solid {score_color};padding:1.5rem;border-radius:16px;margin-bottom:1rem;box-shadow:0 8px 24px rgba(0,0,0,0.3);"><div style="display:flex;justify-content:space-between;align-items:center;"><h3 style="color:{COLORS["text_1"]};margin:0;">📝 {analyzer.company_name}</h3><span style="font-size:1.5rem;font-weight:900;color:{score_color};">{thesis.get("score", "N/A")}</span></div></div>', unsafe_allow_html=True)
     for part in thesis.get('thesis_parts', []): st.markdown(f"- {part}")
     st.markdown("---"); st.markdown(f"### {thesis.get('overall', '⚠️ No data')}")
     st.caption("💡 Auto-generated from reported financial data.")

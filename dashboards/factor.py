@@ -2,6 +2,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 from models.factor import FactorInvesting
+from theme import COLORS, style_fig
 
 def create_factor_investing_dashboard(analyzer):
     prices = analyzer.financials.get('prices')
@@ -22,15 +23,15 @@ def create_factor_investing_dashboard(analyzer):
         with col:
             score = data.get('score', 'N/A')
             classification = data.get('classification', 'N/A')
-            color = data.get('color', '#94a3b8')
+            color = data.get('color', COLORS['text_2'])
             
             st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border: 2px solid {color}; 
-                        padding: 1rem; border-radius: 12px; text-align: center; min-height: 160px;">
-                <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">{factor}</div>
+            <div style="background: linear-gradient(160deg, {COLORS['surface']}, {COLORS['bg_2']}); border: 1px solid {color}55; border-top: 2px solid {color};
+                        padding: 1rem; border-radius: 14px; text-align: center; min-height: 160px; box-shadow: 0 8px 20px rgba(0,0,0,0.25);">
+                <div style="font-size: 0.75rem; color: {COLORS['text_3']}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">{factor}</div>
                 <div style="font-size: 2rem; font-weight: 900; color: {color};">{score}</div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: {color};">{classification}</div>
-                <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.5rem;">{data.get('detail', '')[:60]}</div>
+                <div style="font-size: 0.65rem; color: {COLORS['text_3']}; margin-top: 0.5rem;">{data.get('detail', '')[:60]}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -49,13 +50,16 @@ def create_factor_investing_dashboard(analyzer):
         theta=categories,
         fill='toself',
         name='Factor Exposure',
-        line=dict(color='#667eea', width=2),
-        fillcolor='rgba(102,126,234,0.3)'
+        line=dict(color=COLORS['accent_1'], width=2),
+        fillcolor='rgba(109,94,248,0.28)'
     ))
     fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        polar=dict(
+            bgcolor='rgba(0,0,0,0)',
+            radialaxis=dict(visible=True, range=[0, 100], gridcolor=COLORS['border'], linecolor=COLORS['border']),
+            angularaxis=dict(gridcolor=COLORS['border'], linecolor=COLORS['border'])
+        ),
         showlegend=False,
         height=400,
-        template='plotly_white'
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(style_fig(fig), use_container_width=True)

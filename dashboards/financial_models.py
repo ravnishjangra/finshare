@@ -11,6 +11,7 @@ from models.piotroski import PiotroskiFScore
 from models.altman import AltmanZScore
 from models.ohlson import OhlsonOScore
 from models.fear_greed import FearGreedIndex
+from theme import COLORS, style_fig
 
 def create_financial_models_dashboard(analyzer):
     st.markdown('<div class="section-header">📊 Advanced Financial Models</div>', unsafe_allow_html=True)
@@ -40,20 +41,21 @@ def create_financial_models_dashboard(analyzer):
                 number={'font': {'color': fg['color'], 'size': 48}},
                 title={'text': "Fear & Greed"},
                 gauge={
-                    'axis': {'range': [0, 100], 'tickcolor': '#94a3b8'},
+                    'axis': {'range': [0, 100], 'tickcolor': COLORS['text_3']},
                     'bar': {'color': fg['color']},
+                    'bgcolor': COLORS['bg_2'],
                     'steps': [
-                        {'range': [0, 25], 'color': "rgba(239,68,68,0.3)"},
-                        {'range': [25, 45], 'color': "rgba(245,158,11,0.3)"},
-                        {'range': [45, 55], 'color': "rgba(148,163,184,0.3)"},
-                        {'range': [55, 75], 'color': "rgba(52,211,153,0.3)"},
-                        {'range': [75, 100], 'color': "rgba(16,185,129,0.3)"},
+                        {'range': [0, 25], 'color': "rgba(255,93,122,0.25)"},
+                        {'range': [25, 45], 'color': "rgba(245,185,66,0.25)"},
+                        {'range': [45, 55], 'color': "rgba(170,177,197,0.25)"},
+                        {'range': [55, 75], 'color': "rgba(94,234,212,0.25)"},
+                        {'range': [75, 100], 'color': "rgba(34,211,143,0.25)"},
                     ],
-                    'threshold': {'line': {'color': 'white', 'width': 3}, 'value': fg['score']}
+                    'threshold': {'line': {'color': COLORS['text_1'], 'width': 3}, 'value': fg['score']}
                 }
             ))
             fig.update_layout(height=250)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(style_fig(fig), use_container_width=True)
             st.markdown(f"<h3 style='text-align:center;color:{fg['color']};'>{fg['sentiment']}</h3>", unsafe_allow_html=True)
             st.caption(f"💡 {fg['advice']}")
         
@@ -61,7 +63,7 @@ def create_financial_models_dashboard(analyzer):
             for factor, score in fg['factors'].items():
                 s = int(score) if pd.notna(score) and not np.isnan(score) else 12
                 bar = '█' * s + '░' * (25 - s)
-                factor_color = '#10b981' if s > 15 else '#f59e0b' if s > 8 else '#ef4444'
+                factor_color = COLORS['up'] if s > 15 else COLORS['neutral'] if s > 8 else COLORS['down']
                 st.markdown(f"**{factor}**: <span style='color:{factor_color}'>{bar}</span> {score}/25", unsafe_allow_html=True)
     
     # ===== SECTION 2: PERFORMANCE METRICS =====
@@ -172,10 +174,13 @@ def create_financial_models_dashboard(analyzer):
                    dupont['three_step']['asset_turnover'] * 100,
                    dupont['three_step']['equity_multiplier'] * 10,
                    dupont['three_step']['roe']],
-                connector={"line": {"color": "#94a3b8"}},
+                connector={"line": {"color": COLORS['text_3']}},
+                increasing={"marker": {"color": COLORS['accent_1']}},
+                decreasing={"marker": {"color": COLORS['down']}},
+                totals={"marker": {"color": COLORS['up']}},
             ))
-            fig.update_layout(height=280, template='plotly_white', margin=dict(t=10))
-            st.plotly_chart(fig, use_container_width=True)
+            fig.update_layout(height=280, margin=dict(t=10))
+            st.plotly_chart(style_fig(fig), use_container_width=True)
         
         with col2:
             if dupont.get('five_step'):
@@ -197,10 +202,13 @@ def create_financial_models_dashboard(analyzer):
                        dupont['five_step']['asset_turnover']*100,
                        dupont['five_step']['equity_multiplier']*10,
                        dupont['five_step']['roe']],
-                    connector={"line": {"color": "#94a3b8"}},
+                    connector={"line": {"color": COLORS['text_3']}},
+                    increasing={"marker": {"color": COLORS['accent_1']}},
+                    decreasing={"marker": {"color": COLORS['down']}},
+                    totals={"marker": {"color": COLORS['up']}},
                 ))
-                fig.update_layout(height=280, template='plotly_white', margin=dict(t=10))
-                st.plotly_chart(fig, use_container_width=True)
+                fig.update_layout(height=280, margin=dict(t=10))
+                st.plotly_chart(style_fig(fig), use_container_width=True)
     else:
         st.warning("Insufficient data for DuPont analysis")
     
@@ -216,18 +224,19 @@ def create_financial_models_dashboard(analyzer):
             number={'font': {'color': composite['color'], 'size': 48}},
             title={'text': "Health Score"},
             gauge={
-                'axis': {'range': [0, 100]},
+                'axis': {'range': [0, 100], 'tickcolor': COLORS['text_3']},
                 'bar': {'color': composite['color']},
+                'bgcolor': COLORS['bg_2'],
                 'steps': [
-                    {'range': [0, 40], 'color': "rgba(239,68,68,0.2)"},
-                    {'range': [40, 60], 'color': "rgba(245,158,11,0.2)"},
-                    {'range': [60, 80], 'color': "rgba(16,185,129,0.2)"},
-                    {'range': [80, 100], 'color': "rgba(16,185,129,0.4)"},
+                    {'range': [0, 40], 'color': "rgba(255,93,122,0.18)"},
+                    {'range': [40, 60], 'color': "rgba(245,185,66,0.18)"},
+                    {'range': [60, 80], 'color': "rgba(34,211,143,0.18)"},
+                    {'range': [80, 100], 'color': "rgba(34,211,143,0.32)"},
                 ]
             }
         ))
         fig.update_layout(height=250, margin=dict(t=30, b=0))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(style_fig(fig), use_container_width=True)
         st.markdown(f"<h3 style='text-align:center;color:{composite['color']};'>{composite['rating']}</h3>", unsafe_allow_html=True)
     
     with col2:

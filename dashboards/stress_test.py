@@ -2,6 +2,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 from analytics.stress import StressTestEngine
+from theme import COLORS, style_fig
 
 def create_stress_test_dashboard(analyzer):
     st.markdown('<div class="section-header">🛡️ Comprehensive Stress Tests</div>', unsafe_allow_html=True)
@@ -36,11 +37,11 @@ def create_stress_test_dashboard(analyzer):
 
     def color_severity(val):
         if 'CRITICAL' in str(val) or 'EXTREME' in str(val) or 'MAXIMUM' in str(val):
-            return 'background-color: rgba(239,68,68,0.3); color: #ef4444; font-weight: bold'
+            return f'background-color: rgba(255,93,122,0.22); color: {COLORS["down"]}; font-weight: bold'
         elif 'HIGH' in str(val):
-            return 'background-color: rgba(245,158,11,0.2); color: #f59e0b; font-weight: bold'
+            return f'background-color: rgba(245,185,66,0.18); color: {COLORS["neutral"]}; font-weight: bold'
         elif 'POSITIVE' in str(val) or 'WINNER' in str(val):
-            return 'background-color: rgba(16,185,129,0.2); color: #10b981; font-weight: bold'
+            return f'background-color: rgba(34,211,143,0.18); color: {COLORS["up"]}; font-weight: bold'
         return ''
     
     try:
@@ -50,6 +51,9 @@ def create_stress_test_dashboard(analyzer):
         st.dataframe(results_df, use_container_width=True, height=500)
 
     severity_counts = results_df['Severity'].str.extract(r'(🔴|🟠|🟡|🟢|💀)')[0].value_counts()
-    fig = go.Figure(data=[go.Pie(labels=severity_counts.index, values=severity_counts.values, hole=0.4)])
-    fig.update_layout(title='Severity Distribution', template='plotly_white', height=350)
-    st.plotly_chart(fig, use_container_width=True)
+    fig = go.Figure(data=[go.Pie(
+        labels=severity_counts.index, values=severity_counts.values, hole=0.4,
+        marker=dict(line=dict(color=COLORS['bg_1'], width=1))
+    )])
+    fig.update_layout(title='Severity Distribution', height=350)
+    st.plotly_chart(style_fig(fig), use_container_width=True)
