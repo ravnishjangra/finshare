@@ -56,14 +56,14 @@ class ProFinancialAnalyzer:
                 
                 if not info or not isinstance(info, dict) or len(info) < 3:
                     if attempt == 0:
-                        time.sleep(5)  # 5 sec retry delay
+                        time.sleep(5)
                         continue
                     return False, {}, None
                 
                 price = info.get('currentPrice') or info.get('regularMarketPrice')
                 if not price or price <= 0:
                     if attempt == 0:
-                        time.sleep(5)  # 5 sec retry delay
+                        time.sleep(5)
                         continue
                     return False, {}, None
                 
@@ -78,13 +78,59 @@ class ProFinancialAnalyzer:
                 
             except Exception:
                 if attempt == 0:
-                    time.sleep(5)  # 5 sec retry delay
+                    time.sleep(5)
                 else:
                     return False, {}, None
         
         return False, {}, None
 
-    # ... rest unchanged ...
+    def _try_tradingview(self):
+        """TradingView data via tvDatafeed - works for US & Indian stocks"""
+        try:
+            from tvDatafeed import TvDatafeed, Interval
+            
+            tv = TvDatafeed()
+            
+            # Determine symbol and exchange
+            if self.ticker.endswith('.NS'):
+                symbol = self.ticker.replace('.NS', '')
+                exchange = 'NSE'
+            elif self.ticker.endswith('.BO'):
+                symbol = self.ticker.replace('.BO', '')
+                exchange = 'BSE'
+            elif self.ticker in ['AAPL','MSFT','GOOGL','AMZN','META','NVDA','TSLA','NFLX','AMD','INTC',
+                                  'JPM','V','WMT','DIS','BA','NKE','PYPL','UBER','BABA','CRM','ADBE',
+                                  'SNAP','RIVN','LCID','PLTR','SNOW','ZM','DOCU','SQ','COIN']:
+                symbol = self.ticker
+                exchange = 'NASDAQ'
+            else:
+                symbol = self.ticker
+                exchange = 'NSE'
+            
+            data = tv.get_hist(symbol=symbol, exchange=exchange, interval=Interval.in_daily, n_bars=5)
+            
+            # If NSE fails for a US stock, try NASDAQ
+            if (data is None or data.empty) and exchange == 'NSE':
+                data = tv.get_hist(symbol=symbol, exchange='NASDAQ', interval=Interval.in_daily, n_bars=5)
+            
+            if data is not None and not data.empty:
+                current_price = float(data['close'].iloc[-1])
+                if current_price > 0:
+                    prev_close = float(data['close'].iloc[-2]) if len(data) > 1 else current_price
+                    return {
+                        'currentPrice': current_price,
+                        'regularMarketPrice': current_price,
+                        'previousClose': prev_close,
+                        'open': float(data['open'].iloc[-1]),
+                        'dayHigh': float(data['high'].iloc[-1]),
+                        'dayLow': float(data['low'].iloc[-1]),
+                        'volume': int(data['volume'].iloc[-1]) if 'volume' in data.columns else 0,
+                    }
+        except Exception:
+            pass
+        
+        return {}
+
     def _try_yahooquery(self):
         """Backup source"""
         try:
@@ -182,8 +228,9 @@ class ProFinancialAnalyzer:
         return {}, None
 
     def get_live_price(self):
-        """Priority: 1) yfinance (with retry) 2) yahooquery 3) API fallbacks"""
+        """Priority: 1) yfinance 2) TradingView 3) yahooquery 4) API fallbacks"""
         
+        # Try 1: yfinance
         success, info, stock = self._try_yfinance()
         if success:
             self._populate_from_info(info)
@@ -192,6 +239,19 @@ class ProFinancialAnalyzer:
             self.data_source = 'Yahoo Finance'
             return True
 
+        # Try 2: TradingView
+        info = self._try_tradingview()
+        if info and info.get('currentPrice'):
+            self._populate_from_info(info)
+            self._info_cache = info
+            self.data_source = 'TradingView'
+            try:
+                self.stock = _get_cached_ticker(self.ticker)
+            except:
+                pass
+            return True
+
+        # Try 3: yahooquery
         success, info = self._try_yahooquery()
         if success and info.get('currentPrice'):
             self._populate_from_info(info)
@@ -200,6 +260,7 @@ class ProFinancialAnalyzer:
             self.stock = _get_cached_ticker(self.ticker)
             return True
 
+        # Try 4: API fallbacks
         info, source = self._try_api_fallback()
         if info:
             self.live_price_data = {'current_price': info.get('currentPrice')}

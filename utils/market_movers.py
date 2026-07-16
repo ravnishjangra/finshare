@@ -5,12 +5,17 @@ import pandas as pd
 def _fetch_tv_data(market, sort_col, ascending, limit, fields):
     """Fetch data from TradingView scanner"""
     from tradingview_screener import Query
-    query = Query().select(*fields).set_markets(market)
-    if sort_col:
-        query = query.order_by(sort_col, ascending=ascending)
-    query = query.limit(limit)
-    total, data = query.get_scanner_data()
-    return data
+    import traceback
+    try:
+        query = Query().select(*fields).set_markets(market)
+        if sort_col:
+            query = query.order_by(sort_col, ascending=ascending)
+        query = query.limit(limit)
+        total, data = query.get_scanner_data()
+        return data
+    except Exception as e:
+        print(f"TV ERROR: {traceback.format_exc()}")
+        raise e
 
 def show_market_movers():
     st.markdown("### 🚀 Market Movers")
@@ -38,7 +43,8 @@ def show_market_movers():
                 st.session_state['movers_losers'] = losers
                 st.session_state['movers_gainers'] = gainers
                 st.session_state['movers_data'] = True
-            except:
+            except Exception as e:
+                print(f"MOVERS ERROR: {e}")
                 st.session_state['movers_losers'] = None
                 st.session_state['movers_gainers'] = None
     
@@ -116,4 +122,5 @@ def show_stock_screener():
                 else:
                     st.warning("No data available.")
             except Exception as e:
+                print(f"SCREENER ERROR: {e}")
                 st.warning(f"Screener temporarily unavailable.")
