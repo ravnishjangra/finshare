@@ -46,7 +46,12 @@ class ProFinancialAnalyzer:
         """Primary source with retry - works for all stocks"""
         for attempt in range(2):
             try:
-                stock = _get_cached_ticker(self.ticker)
+                # On retry, force fresh ticker to bypass yfinance internal cache
+                if attempt == 0:
+                    stock = _get_cached_ticker(self.ticker)
+                else:
+                    stock = yf.Ticker(self.ticker)
+                
                 info = stock.info
                 
                 if not info or not isinstance(info, dict) or len(info) < 3:
@@ -334,7 +339,6 @@ class ProFinancialAnalyzer:
             info = self.financials.get('info', {})
             cp = self.live_price_data.get('current_price')
 
-            # ===== SANITY LIMITS =====
             LIMITS = {
                 'Debt to Equity': (0, 20),
                 'P/E Ratio': (0, 1000),
@@ -351,7 +355,6 @@ class ProFinancialAnalyzer:
                 'Earnings Growth (YoY)': (-200, 500),
             }
 
-            # ===== FROM YFINANCE INFO =====
             if isinstance(info, dict):
                 ratio_map = [
                     ('returnOnEquity', 'ROE', 100),
@@ -381,7 +384,6 @@ class ProFinancialAnalyzer:
                         except (ValueError, TypeError):
                             pass
 
-            # ===== DIVIDEND YIELD: Calculate from cashflow (not yfinance) =====
             if 'Dividend Yield' not in self.ratios:
                 try:
                     if cashflow is not None and not cashflow.empty and cp and cp > 0:
@@ -400,7 +402,6 @@ class ProFinancialAnalyzer:
                 except:
                     pass
             
-            # Fallback: yfinance dividend yield (only if reasonable)
             if 'Dividend Yield' not in self.ratios:
                 yf_div = info.get('dividendYield') if isinstance(info, dict) else None
                 if yf_div is not None:
@@ -411,7 +412,6 @@ class ProFinancialAnalyzer:
                     except (ValueError, TypeError):
                         pass
 
-            # ===== FROM FINANCIAL STATEMENTS =====
             if income is not None and not income.empty:
                 rev = self._safe_get(income, ['Total Revenue', 'Revenue'])
                 ni = self._safe_get(income, ['Net Income', 'Net Income Common Stockholders'])
@@ -437,7 +437,6 @@ class ProFinancialAnalyzer:
                         if -200 <= growth <= 500:
                             self.ratios['Earnings Growth (YoY)'] = growth
 
-                # Per-share calculations
                 shares = self._safe_get(income, ['Diluted Average Shares', 'Basic Average Shares'])
                 if shares and shares > 0 and cp:
                     if ni and 'EPS' not in self.ratios:
