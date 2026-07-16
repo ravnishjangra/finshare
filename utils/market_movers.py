@@ -2,23 +2,6 @@
 import streamlit as st
 import pandas as pd
 
-def get_market_movers(market='india', limit=5):
-    """Get top gainers and losers"""
-    try:
-        from tradingview_screener import Query
-        
-        gainers = Query().select('name', 'close', 'change', 'volume')\
-            .set_markets(market)\
-            .get_scanner_data(sort='change|desc', limit=limit)
-        
-        losers = Query().select('name', 'close', 'change', 'volume')\
-            .set_markets(market)\
-            .get_scanner_data(sort='change|asc', limit=limit)
-        
-        return gainers, losers
-    except Exception:
-        return None, None
-
 def show_market_movers():
     """Display market movers in Streamlit"""
     st.markdown("### 🚀 Market Movers")
@@ -27,53 +10,57 @@ def show_market_movers():
     
     with col1:
         st.markdown("**🔴 Top Losers**")
-        losers = None
         try:
             from tradingview_screener import Query
-            losers = Query().select('name', 'close', 'change', 'volume')\
-                .set_markets('india')\
-                .get_scanner_data(sort='change|asc', limit=5)
-        except:
-            pass
-        
-        if losers is not None and not losers.empty:
-            for _, row in losers.iterrows():
-                change = row.get('change', 0)
-                st.markdown(
-                    f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;"
-                    f"border-bottom:1px solid rgba(255,255,255,0.05);'>"
-                    f"<span style='color:#e2e8f0;font-size:0.85rem;'>{row.get('name','N/A')[:20]}</span>"
-                    f"<span style='color:#ef4444;font-weight:600;font-size:0.85rem;'>{change:.2f}%</span>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-        else:
-            st.caption("Data not available")
+            losers = (Query()
+                .select('name', 'close', 'change', 'volume')
+                .set_markets('india')
+                .order_by('change', ascending=True)
+                .limit(5)
+                .get_scanner_data())
+            
+            if losers is not None and not losers.empty:
+                for _, row in losers.iterrows():
+                    change = row.get('change', 0)
+                    st.markdown(
+                        f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;"
+                        f"border-bottom:1px solid rgba(255,255,255,0.05);'>"
+                        f"<span style='color:#e2e8f0;font-size:0.85rem;'>{str(row.get('name','N/A'))[:20]}</span>"
+                        f"<span style='color:#ef4444;font-weight:600;font-size:0.85rem;'>{change:.2f}%</span>"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.caption("Data not available")
+        except Exception as e:
+            st.caption(f"Temporarily unavailable")
     
     with col2:
         st.markdown("**🟢 Top Gainers**")
-        gainers = None
         try:
             from tradingview_screener import Query
-            gainers = Query().select('name', 'close', 'change', 'volume')\
-                .set_markets('india')\
-                .get_scanner_data(sort='change|desc', limit=5)
-        except:
-            pass
-        
-        if gainers is not None and not gainers.empty:
-            for _, row in gainers.iterrows():
-                change = row.get('change', 0)
-                st.markdown(
-                    f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;"
-                    f"border-bottom:1px solid rgba(255,255,255,0.05);'>"
-                    f"<span style='color:#e2e8f0;font-size:0.85rem;'>{row.get('name','N/A')[:20]}</span>"
-                    f"<span style='color:#10b981;font-weight:600;font-size:0.85rem;'>+{change:.2f}%</span>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-        else:
-            st.caption("Data not available")
+            gainers = (Query()
+                .select('name', 'close', 'change', 'volume')
+                .set_markets('india')
+                .order_by('change', ascending=False)
+                .limit(5)
+                .get_scanner_data())
+            
+            if gainers is not None and not gainers.empty:
+                for _, row in gainers.iterrows():
+                    change = row.get('change', 0)
+                    st.markdown(
+                        f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;"
+                        f"border-bottom:1px solid rgba(255,255,255,0.05);'>"
+                        f"<span style='color:#e2e8f0;font-size:0.85rem;'>{str(row.get('name','N/A'))[:20]}</span>"
+                        f"<span style='color:#10b981;font-weight:600;font-size:0.85rem;'>+{change:.2f}%</span>"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.caption("Data not available")
+        except Exception as e:
+            st.caption(f"Temporarily unavailable")
 
 def show_stock_screener():
     """Advanced Stock Screener with custom filters"""
@@ -118,11 +105,11 @@ def show_stock_screener():
             try:
                 from tradingview_screener import Query
                 
-                query = Query().select(
-                    'name', 'close', 'change', 'market_cap_basic',
-                    'price_earnings_ttm', 'return_on_equity',
-                    'revenue_growth_yoy', 'dividend_yield', 'volume'
-                ).set_markets(market)
+                query = (Query()
+                    .select('name', 'close', 'change', 'market_cap_basic',
+                           'price_earnings_ttm', 'return_on_equity',
+                           'revenue_growth_yoy', 'dividend_yield', 'volume')
+                    .set_markets(market))
                 
                 # Apply filters
                 if pe_min > 0:
@@ -146,18 +133,20 @@ def show_stock_screener():
                 
                 # Sort mapping
                 sort_map = {
-                    "Market Cap": 'market_cap_basic|desc',
-                    "P/E Ratio": 'price_earnings_ttm|asc',
-                    "ROE": 'return_on_equity|desc',
-                    "Revenue Growth": 'revenue_growth_yoy|desc',
-                    "Dividend Yield": 'dividend_yield|desc',
-                    "Change %": 'change|desc',
+                    "Market Cap": ('market_cap_basic', False),
+                    "P/E Ratio": ('price_earnings_ttm', True),
+                    "ROE": ('return_on_equity', False),
+                    "Revenue Growth": ('revenue_growth_yoy', False),
+                    "Dividend Yield": ('dividend_yield', False),
+                    "Change %": ('change', False),
                 }
                 
-                results = query.get_scanner_data(sort=sort_map.get(sort_by, 'market_cap_basic|desc'), limit=20)
+                sort_col, sort_asc = sort_map.get(sort_by, ('market_cap_basic', False))
+                query = query.order_by(sort_col, ascending=sort_asc).limit(20)
+                
+                results = query.get_scanner_data()
                 
                 if results is not None and not results.empty:
-                    # Format data
                     display_df = pd.DataFrame({
                         'Stock': results.get('name', 'N/A'),
                         'Price': results.get('close', 0).round(2),
@@ -166,7 +155,6 @@ def show_stock_screener():
                         'ROE %': results.get('return_on_equity', 0).round(1),
                         'Rev Growth %': results.get('revenue_growth_yoy', 0).round(1),
                         'Div Yield %': results.get('dividend_yield', 0).round(2),
-                        'Volume': results.get('volume', 0).apply(lambda x: f'{x/1e5:.1f}L' if x > 0 else 'N/A'),
                     })
                     
                     st.markdown(f"**Found {len(display_df)} stocks**")
@@ -176,4 +164,3 @@ def show_stock_screener():
             
             except Exception as e:
                 st.warning("Screener temporarily unavailable. Try again later.")
-                st.caption(f"Error: {str(e)[:100]}")
