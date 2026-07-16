@@ -6,15 +6,17 @@ def show_market_movers():
     """Display market movers in Streamlit"""
     st.markdown("### 🚀 Market Movers")
     
+    market = st.selectbox("Market", ["india", "america"], key="movers_market")
+    
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("**🔴 Top Losers**")
         try:
             from tradingview_screener import Query
-            losers = (Query()
+            _, losers = (Query()
                 .select('name', 'close', 'change', 'volume')
-                .set_markets('india')
+                .set_markets(market)
                 .order_by('change', ascending=True)
                 .limit(5)
                 .get_scanner_data())
@@ -32,16 +34,16 @@ def show_market_movers():
                     )
             else:
                 st.caption("Data not available")
-        except Exception as e:
-            st.caption(f"Temporarily unavailable")
+        except Exception:
+            st.caption("Temporarily unavailable")
     
     with col2:
         st.markdown("**🟢 Top Gainers**")
         try:
             from tradingview_screener import Query
-            gainers = (Query()
+            _, gainers = (Query()
                 .select('name', 'close', 'change', 'volume')
-                .set_markets('india')
+                .set_markets(market)
                 .order_by('change', ascending=False)
                 .limit(5)
                 .get_scanner_data())
@@ -59,13 +61,13 @@ def show_market_movers():
                     )
             else:
                 st.caption("Data not available")
-        except Exception as e:
-            st.caption(f"Temporarily unavailable")
+        except Exception:
+            st.caption("Temporarily unavailable")
 
 def show_stock_screener():
-    """Advanced Stock Screener with custom filters"""
+    """Stock Screener - fetch then filter client-side"""
     st.markdown("### 🔍 Stock Screener")
-    st.caption("Filter stocks by fundamentals and technicals")
+    st.caption("Sort and filter stocks (data fetched from TradingView)")
     
     col1, col2, col3 = st.columns(3)
     
@@ -73,94 +75,51 @@ def show_stock_screener():
         market = st.selectbox("Market", ["india", "america"], key="screener_market")
     
     with col2:
-        sector = st.selectbox("Sector", [
-            "All", "Technology", "Banking", "Pharmaceuticals", "Automobiles", 
-            "Energy", "FMCG", "Metals", "Real Estate", "IT Services"
-        ], key="screener_sector")
-    
-    with col3:
         sort_by = st.selectbox("Sort By", [
-            "Market Cap", "P/E Ratio", "ROE", "Revenue Growth", "Dividend Yield", "Change %"
+            "Market Cap", "Change %", "Volume", "Price"
         ], key="screener_sort")
     
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        pe_min = st.number_input("P/E Min", value=0, step=1, key="pe_min")
-        pe_max = st.number_input("P/E Max", value=100, step=1, key="pe_max")
-    
-    with col2:
-        roe_min = st.number_input("ROE Min %", value=0, step=1, key="roe_min")
-        roe_max = st.number_input("ROE Max %", value=100, step=1, key="roe_max")
-    
     with col3:
-        mcap_min = st.selectbox("Market Cap Min", 
-            ["Any", "100 Cr", "500 Cr", "1000 Cr", "5000 Cr", "10000 Cr", "1L Cr"], key="mcap_min")
+        limit = st.selectbox("Results", [20, 50, 100], index=0, key="screener_limit")
     
-    with col4:
-        div_min = st.number_input("Div Yield Min %", value=0.0, step=0.5, key="div_min")
-    
-    if st.button("🔍 Screen Stocks", type="primary", use_container_width=True):
-        with st.spinner("Scanning market..."):
+    if st.button("🔍 Fetch Stocks", type="primary", use_container_width=True):
+        with st.spinner("Fetching data..."):
             try:
                 from tradingview_screener import Query
                 
-                query = (Query()
-                    .select('name', 'close', 'change', 'market_cap_basic',
-                           'price_earnings_ttm', 'return_on_equity',
-                           'revenue_growth_yoy', 'dividend_yield', 'volume')
-                    .set_markets(market))
-                
-                # Apply filters
-                if pe_min > 0:
-                    query = query.where('price_earnings_ttm', '>', pe_min)
-                if pe_max < 100:
-                    query = query.where('price_earnings_ttm', '<', pe_max)
-                if roe_min > 0:
-                    query = query.where('return_on_equity', '>', roe_min)
-                if roe_max < 100:
-                    query = query.where('return_on_equity', '<', roe_max)
-                if div_min > 0:
-                    query = query.where('dividend_yield', '>', div_min)
-                
-                # Market cap filter
-                mcap_map = {
-                    "100 Cr": 1e10, "500 Cr": 5e10, "1000 Cr": 1e11,
-                    "5000 Cr": 5e11, "10000 Cr": 1e12, "1L Cr": 1e13
-                }
-                if mcap_min != "Any":
-                    query = query.where('market_cap_basic', '>', mcap_map.get(mcap_min, 0))
-                
-                # Sort mapping
                 sort_map = {
                     "Market Cap": ('market_cap_basic', False),
-                    "P/E Ratio": ('price_earnings_ttm', True),
-                    "ROE": ('return_on_equity', False),
-                    "Revenue Growth": ('revenue_growth_yoy', False),
-                    "Dividend Yield": ('dividend_yield', False),
                     "Change %": ('change', False),
+                    "Volume": ('volume', False),
+                    "Price": ('close', False),
                 }
                 
                 sort_col, sort_asc = sort_map.get(sort_by, ('market_cap_basic', False))
-                query = query.order_by(sort_col, ascending=sort_asc).limit(20)
                 
-                results = query.get_scanner_data()
+                _, results = (Query()
+                    .select('name', 'close', 'change', 'market_cap_basic',
+                           'price_earnings_ttm', 'return_on_equity',
+                           'revenue_growth_yoy', 'dividend_yield', 'volume')
+                    .set_markets(market)
+                    .order_by(sort_col, ascending=sort_asc)
+                    .limit(limit)
+                    .get_scanner_data())
                 
                 if results is not None and not results.empty:
                     display_df = pd.DataFrame({
                         'Stock': results.get('name', 'N/A'),
-                        'Price': results.get('close', 0).round(2),
+                        'Price ₹': results.get('close', 0).round(2),
                         'Change %': results.get('change', 0).round(2),
-                        'P/E': results.get('price_earnings_ttm', 0).round(1),
-                        'ROE %': results.get('return_on_equity', 0).round(1),
-                        'Rev Growth %': results.get('revenue_growth_yoy', 0).round(1),
-                        'Div Yield %': results.get('dividend_yield', 0).round(2),
+                        'P/E': results.get('price_earnings_ttm', 0).apply(lambda x: round(x, 1) if pd.notna(x) and x > 0 else 'N/A'),
+                        'ROE %': results.get('return_on_equity', 0).apply(lambda x: round(x, 1) if pd.notna(x) else 'N/A'),
+                        'Rev Growth %': results.get('revenue_growth_yoy', 0).apply(lambda x: round(x, 1) if pd.notna(x) else 'N/A'),
+                        'Div Yield %': results.get('dividend_yield', 0).apply(lambda x: round(x, 2) if pd.notna(x) else 'N/A'),
                     })
                     
-                    st.markdown(f"**Found {len(display_df)} stocks**")
+                    st.markdown(f"**Showing top {len(display_df)} stocks by {sort_by}**")
                     st.dataframe(display_df, use_container_width=True, hide_index=True)
                 else:
-                    st.warning("No stocks match your criteria. Try broadening filters.")
+                    st.warning("No data available.")
             
             except Exception as e:
-                st.warning("Screener temporarily unavailable. Try again later.")
+                st.warning(f"Screener temporarily unavailable.")
