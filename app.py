@@ -254,9 +254,18 @@ def main():
                     st.error(f"❌ Error: {str(e)[:100]}. Please try again.")
         else:
             # Show market movers and screener when no analysis is active
-            show_market_movers()
+            try:
+                show_market_movers()
+            except Exception as e:
+                st.warning(f"Market movers unavailable")
+            
             st.markdown("---")
-            show_stock_screener()
+            
+            try:
+                show_stock_screener()
+            except Exception as e:
+                st.warning(f"Screener unavailable")
+            
             st.markdown("---")
             st.markdown('''<div class="empty-state" style="margin-top:0.5rem;">
                 <div class="icon">🏦</div>
