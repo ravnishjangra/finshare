@@ -6,15 +6,15 @@ import requests
 import time
 from config import CURRENCY_SYMBOLS, INDIAN_STOCKS_DB
 
-# ===== GLOBAL TICKER CACHE (5-min TTL) =====
+# ===== GLOBAL TICKER CACHE (10-min TTL) =====
 _TICKER_CACHE = {}
 
 def _get_cached_ticker(symbol):
-    """Get or create yfinance Ticker - auto-refresh every 5 minutes"""
+    """Get or create yfinance Ticker - auto-refresh every 10 minutes"""
     now = time.time()
-    if symbol not in _TICKER_CACHE or (now - _TICKER_CACHE[symbol]['time']) > 300:
+    if symbol not in _TICKER_CACHE or (now - _TICKER_CACHE[symbol]['time']) > 600:
         if symbol not in _TICKER_CACHE:
-            time.sleep(1.0)  # 1 sec delay only for NEW tickers (rate limit protection)
+            time.sleep(3.0)  # 3 sec delay only for NEW tickers (rate limit protection)
         _TICKER_CACHE[symbol] = {
             'ticker': yf.Ticker(symbol),
             'time': now
@@ -56,14 +56,14 @@ class ProFinancialAnalyzer:
                 
                 if not info or not isinstance(info, dict) or len(info) < 3:
                     if attempt == 0:
-                        time.sleep(3)
+                        time.sleep(5)  # 5 sec retry delay
                         continue
                     return False, {}, None
                 
                 price = info.get('currentPrice') or info.get('regularMarketPrice')
                 if not price or price <= 0:
                     if attempt == 0:
-                        time.sleep(3)
+                        time.sleep(5)  # 5 sec retry delay
                         continue
                     return False, {}, None
                 
@@ -78,12 +78,13 @@ class ProFinancialAnalyzer:
                 
             except Exception:
                 if attempt == 0:
-                    time.sleep(3)
+                    time.sleep(5)  # 5 sec retry delay
                 else:
                     return False, {}, None
         
         return False, {}, None
 
+    # ... rest unchanged ...
     def _try_yahooquery(self):
         """Backup source"""
         try:
