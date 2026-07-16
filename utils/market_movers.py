@@ -2,22 +2,16 @@
 import streamlit as st
 import pandas as pd
 
-@st.cache_data(ttl=120)
-def fetch_scanner_data(market, sort_col, ascending, limit=20, fields=None):
-    """Fetch data from TradingView scanner with caching"""
+def _fetch_tv_data(market, sort_col, ascending, limit, fields):
+    """Fetch data from TradingView scanner (no cache, with retry)"""
     from tradingview_screener import Query
-    if fields is None:
-        fields = ['name', 'close', 'change', 'market_cap_basic',
-                  'price_earnings_ttm', 'return_on_equity',
-                  'revenue_growth_yoy', 'dividend_yield', 'volume']
     
     query = Query().select(*fields).set_markets(market)
-    
     if sort_col:
         query = query.order_by(sort_col, ascending=ascending)
+    query = query.limit(limit)
     
-    query = query.limit(limit * 3)  # Fetch more to filter penny stocks
-    _, data = query.get_scanner_data()
+    total, data = query.get_scanner_data()
     return data
 
 def show_market_movers():
@@ -30,14 +24,12 @@ def show_market_movers():
     with col1:
         st.markdown("**🔴 Top Losers**")
         try:
-            losers = fetch_scanner_data(market, 'change', True, 15, ['name', 'close', 'change'])
+            losers = _fetch_tv_data(market, 'change', True, 15, ['name', 'close', 'change'])
             if losers is not None and not losers.empty:
-                # Filter penny stocks (price > $1 for US, > ₹10 for India)
                 if market == 'america':
                     losers = losers[losers['close'] > 1.0]
                 else:
                     losers = losers[losers['close'] > 10.0]
-                # Filter extreme changes (>90% drop is usually delisting)
                 losers = losers[losers['change'] > -90]
                 losers = losers.head(5)
                 
@@ -60,14 +52,12 @@ def show_market_movers():
     with col2:
         st.markdown("**🟢 Top Gainers**")
         try:
-            gainers = fetch_scanner_data(market, 'change', False, 15, ['name', 'close', 'change'])
+            gainers = _fetch_tv_data(market, 'change', False, 15, ['name', 'close', 'change'])
             if gainers is not None and not gainers.empty:
-                # Filter penny stocks
                 if market == 'america':
                     gainers = gainers[gainers['close'] > 1.0]
                 else:
                     gainers = gainers[gainers['close'] > 10.0]
-                # Filter extreme changes (>500% is usually OTC manipulation)
                 gainers = gainers[gainers['change'] < 500]
                 gainers = gainers.head(5)
                 
@@ -109,11 +99,14 @@ def show_stock_screener():
             }
             sort_col, sort_asc = sort_map.get(sort_by, ('market_cap_basic', False))
             
+            fields = ['name', 'close', 'change', 'market_cap_basic',
+                     'price_earnings_ttm', 'return_on_equity',
+                     'revenue_growth_yoy', 'dividend_yield', 'volume']
+            
             try:
-                results = fetch_scanner_data(market, sort_col, sort_asc, limit)
+                results = _fetch_tv_data(market, sort_col, sort_asc, limit, fields)
                 
                 if results is not None and not results.empty:
-                    # Filter penny stocks for screener too
                     if market == 'america':
                         results = results[results['close'] > 1.0]
                     else:
