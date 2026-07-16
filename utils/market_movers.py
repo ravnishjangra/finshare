@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 
 def _fetch_tv_data(market, sort_col, ascending, limit, fields):
-    """Fetch data from TradingView scanner (no cache, with retry)"""
+    """Fetch data from TradingView scanner"""
     from tradingview_screener import Query
     
     query = Query().select(*fields).set_markets(market)
@@ -24,17 +24,14 @@ def show_market_movers():
     with col1:
         st.markdown("**🔴 Top Losers**")
         try:
-            losers = _fetch_tv_data(market, 'change', True, 15, ['name', 'close', 'change'])
+            losers = _fetch_tv_data(market, 'change', True, 10, ['name', 'close', 'change'])
             if losers is not None and not losers.empty:
-                if market == 'america':
-                    losers = losers[losers['close'] > 1.0]
-                else:
-                    losers = losers[losers['close'] > 10.0]
-                losers = losers[losers['change'] > -90]
+                # Only filter extreme outliers for movers
+                losers = losers[losers['change'] > -50]  # Keep reasonable drops
                 losers = losers.head(5)
                 
                 if losers.empty:
-                    st.caption("No data")
+                    st.caption("No significant movers")
                 else:
                     for _, row in losers.iterrows():
                         change = row.get('change', 0)
@@ -46,23 +43,20 @@ def show_market_movers():
                             f"</div>", unsafe_allow_html=True)
             else:
                 st.caption("No data")
-        except Exception:
+        except Exception as e:
             st.caption("Temporarily unavailable")
     
     with col2:
         st.markdown("**🟢 Top Gainers**")
         try:
-            gainers = _fetch_tv_data(market, 'change', False, 15, ['name', 'close', 'change'])
+            gainers = _fetch_tv_data(market, 'change', False, 10, ['name', 'close', 'change'])
             if gainers is not None and not gainers.empty:
-                if market == 'america':
-                    gainers = gainers[gainers['close'] > 1.0]
-                else:
-                    gainers = gainers[gainers['close'] > 10.0]
-                gainers = gainers[gainers['change'] < 500]
+                # Only filter extreme outliers
+                gainers = gainers[gainers['change'] < 100]  # Keep reasonable gains
                 gainers = gainers.head(5)
                 
                 if gainers.empty:
-                    st.caption("No data")
+                    st.caption("No significant movers")
                 else:
                     for _, row in gainers.iterrows():
                         change = row.get('change', 0)
@@ -107,13 +101,6 @@ def show_stock_screener():
                 results = _fetch_tv_data(market, sort_col, sort_asc, limit, fields)
                 
                 if results is not None and not results.empty:
-                    if market == 'america':
-                        results = results[results['close'] > 1.0]
-                    else:
-                        results = results[results['close'] > 10.0]
-                    
-                    results = results.head(limit)
-                    
                     display_df = pd.DataFrame({
                         'Stock': results.get('name', 'N/A'),
                         'Price': results.get('close', 0).round(2),
