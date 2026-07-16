@@ -1,4 +1,4 @@
-""""Portfolio Optimization Tab - 6 Strategy Comparison"""
+"""Portfolio Optimization Tab - 6 Strategy Comparison"""
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -106,7 +106,7 @@ def create_portfolio_optimization_tab():
                 {'name': 'Max Diversification', 'weights': dict(zip(tickers, w6.round(4))), 'return': port_return(w6), 'volatility': port_vol(w6), 'sharpe': port_sharpe(w6), 'color': COLORS['accent_2']},
             ]
         
-        # ===== PIE CHARTS =====
+        # ===== PIE CHARTS (no style_fig - keeps labels visible) =====
         st.markdown("### 📊 Portfolio Weights by Strategy")
         cols = st.columns(6)
         for col, strat in zip(cols, strategies):
@@ -117,8 +117,9 @@ def create_portfolio_optimization_tab():
                     hole=0.5, textinfo='label+percent',
                     marker=dict(colors=[strat['color']] + ['#232a3d']*10, line=dict(color=COLORS['bg_1'], width=1))
                 )])
-                fig.update_layout(height=250, margin=dict(t=0,b=0,l=10,r=10), showlegend=False)
-                st.plotly_chart(style_fig(fig), use_container_width=True)
+                fig.update_layout(height=250, margin=dict(t=0,b=0,l=10,r=10), showlegend=False,
+                                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig, use_container_width=True)
         
         # ===== COMPARISON TABLE =====
         st.markdown("### 📈 Performance Comparison")
