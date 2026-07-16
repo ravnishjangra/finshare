@@ -104,6 +104,16 @@ def get_all_stocks():
 
 ALL_STOCKS = get_all_stocks()
 
+@st.cache_resource(ttl=120)
+def get_cached_analyzer(ticker, exchange):
+    """Cache analyzer results for 2 minutes - reduces API calls, refreshes quickly"""
+    em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US"}
+    analyzer = ProFinancialAnalyzer(ticker, exchange=em.get(exchange, "NSE"))
+    if analyzer.get_live_price():
+        analyzer.fetch_financial_data()
+        analyzer.calculate_all_ratios()
+    return analyzer
+
 def main():
     st.markdown('''
         <div class="app-header">
@@ -175,11 +185,7 @@ def main():
             
             with st.spinner(f"🔍 Fetching data for {ticker_to_analyze}..."):
                 try:
-                    em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US"}
-                    analyzer = ProFinancialAnalyzer(ticker_to_analyze, exchange=em.get(exchange_to_use, "NSE"))
-                    analyzer.get_live_price()
-                    analyzer.fetch_financial_data()
-                    analyzer.calculate_all_ratios()
+                    analyzer = get_cached_analyzer(ticker_to_analyze, exchange_to_use)
                     
                     if not analyzer.live_price_data.get('current_price'):
                         st.error(f"❌ Could not fetch data for **{ticker_to_analyze}**. Try again in a moment.")
@@ -266,10 +272,8 @@ def main():
             else:
                 with st.spinner("Running stress tests..."):
                     try:
-                        em2 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US"}
-                        a2 = ProFinancialAnalyzer(st2_t.strip().upper(), exchange=em2.get(st2_e, "NSE"))
-                        if a2.get_live_price():
-                            a2.fetch_financial_data()
+                        a2 = get_cached_analyzer(st2_t.strip().upper(), st2_e)
+                        if a2.live_price_data.get('current_price'):
                             create_stress_test_dashboard(a2)
                         else:
                             st.error("Could not fetch data. Try again.")
@@ -289,10 +293,8 @@ def main():
             else:
                 with st.spinner("Calculating..."):
                     try:
-                        em3 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US"}
-                        a3 = ProFinancialAnalyzer(ta_t.strip().upper(), exchange=em3.get(ta_e, "NSE"))
-                        if a3.get_live_price():
-                            a3.fetch_financial_data()
+                        a3 = get_cached_analyzer(ta_t.strip().upper(), ta_e)
+                        if a3.live_price_data.get('current_price'):
                             create_technical_dashboard(a3)
                         else:
                             st.error("Could not fetch data. Try again.")
