@@ -1,5 +1,4 @@
 """Finshare Pro - Enterprise Financial Analysis Platform"""
-from utils.market_movers import show_market_movers, show_stock_screener
 from dashboards.financial_models import create_financial_models_dashboard
 import streamlit as st
 from datetime import datetime
@@ -253,20 +252,6 @@ def main():
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)[:100]}. Please try again.")
         else:
-            # Show market movers and screener when no analysis is active
-            try:
-                show_market_movers()
-            except Exception as e:
-                st.warning(f"Market movers unavailable")
-            
-            st.markdown("---")
-            
-            try:
-                show_stock_screener()
-            except Exception as e:
-                st.warning(f"Screener unavailable")
-            
-            st.markdown("---")
             st.markdown('''<div class="empty-state" style="margin-top:0.5rem;">
                 <div class="icon">🏦</div>
                 <h2>Welcome to Finshare Pro</h2>

@@ -88,7 +88,10 @@ class ProFinancialAnalyzer:
         """TradingView data via tvDatafeed - works for US & Indian stocks"""
         try:
             from tvDatafeed import TvDatafeed, Interval
-            
+        except ImportError:
+            return {}  # Package not installed (e.g. Streamlit Cloud)
+        
+        try:
             tv = TvDatafeed()
             
             # Determine symbol and exchange
