@@ -252,14 +252,11 @@ def main():
                                     st.info("Not available.")
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)[:100]}. Please try again.")
-        elif not st.session_state.get('analyze_clicked'):
-            # Show market movers and screener
-            tab_a, tab_b = st.tabs(["🚀 Market Movers", "🔍 Stock Screener"])
-            with tab_a:
-                show_market_movers()
-            with tab_b:
-                show_stock_screener()
-            
+        else:
+            # Show market movers and screener when no analysis is active
+            show_market_movers()
+            st.markdown("---")
+            show_stock_screener()
             st.markdown("---")
             st.markdown('''<div class="empty-state" style="margin-top:0.5rem;">
                 <div class="icon">🏦</div>
