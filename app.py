@@ -74,10 +74,8 @@ st.markdown("""
     [data-testid="stDataFrame"] { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-in { animation: fadeInUp 0.45s cubic-bezier(0.4, 0, 0.2, 1) backwards; }
-    .animate-in:nth-child(1) { animation-delay: 0.02s; }
-    .animate-in:nth-child(2) { animation-delay: 0.06s; }
-    .animate-in:nth-child(3) { animation-delay: 0.10s; }
-    .animate-in:nth-child(4) { animation-delay: 0.14s; }
+    .animate-in:nth-child(1) { animation-delay: 0.02s; } .animate-in:nth-child(2) { animation-delay: 0.06s; }
+    .animate-in:nth-child(3) { animation-delay: 0.10s; } .animate-in:nth-child(4) { animation-delay: 0.14s; }
     .animate-in:nth-child(5) { animation-delay: 0.18s; }
     ::-webkit-scrollbar { width: 7px; height: 7px; }
     ::-webkit-scrollbar-track { background: var(--bg-1); }
@@ -159,13 +157,10 @@ def main():
             st.write("")
             analyze_btn = st.button("🔍 Analyze", type="primary", use_container_width=True)
 
-        if ticker_input:
-            st.session_state['current_ticker'] = ticker_input.upper().strip()
-        if exchange:
-            st.session_state['current_exchange'] = exchange
-
         if analyze_btn:
             st.session_state['analyze_clicked'] = True
+            st.session_state['current_ticker'] = ticker_input.upper().strip()
+            st.session_state['current_exchange'] = exchange
 
         if ticker_input and len(ticker_input) >= 1:
             search_term = ticker_input.upper().strip()
