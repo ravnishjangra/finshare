@@ -106,14 +106,19 @@ def create_portfolio_optimization_tab():
                 {'name': 'Max Diversification', 'weights': dict(zip(tickers, w6.round(4))), 'return': port_return(w6), 'volatility': port_vol(w6), 'sharpe': port_sharpe(w6), 'color': COLORS['accent_2']},
             ]
         
-        # ===== PIE CHARTS (no style_fig - keeps labels visible) =====
+        # ===== PIE CHARTS (filter tiny weights < 0.5%) =====
         st.markdown("### 📊 Portfolio Weights by Strategy")
         cols = st.columns(6)
         for col, strat in zip(cols, strategies):
             with col:
                 st.markdown(f"**{strat['name']}**")
+                # Filter out weights < 0.5% to keep charts clean
+                weights = {k: v for k, v in strat['weights'].items() if v > 0.005}
+                if not weights:
+                    weights = dict(sorted(strat['weights'].items(), key=lambda x: x[1], reverse=True)[:3])
+                
                 fig = go.Figure(data=[go.Pie(
-                    labels=list(strat['weights'].keys()), values=list(strat['weights'].values()),
+                    labels=list(weights.keys()), values=list(weights.values()),
                     hole=0.5, textinfo='label+percent',
                     marker=dict(colors=[strat['color']] + ['#232a3d']*10, line=dict(color=COLORS['bg_1'], width=1))
                 )])
