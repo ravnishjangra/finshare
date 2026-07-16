@@ -146,10 +146,11 @@ def main():
             elif ticker_upper.endswith('.BO'):
                 default_exchange = "BSE India (.BO)"
             else:
-                default_exchange = st.session_state.get('current_exchange', 'Auto-detect')
+                # Default to NSE for unknown tickers (most manual entries are Indian stocks)
+                default_exchange = "NSE India (.NS)"
             
             exchange_options = ["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"]
-            default_idx = exchange_options.index(default_exchange) if default_exchange in exchange_options else 0
+            default_idx = exchange_options.index(default_exchange) if default_exchange in exchange_options else 1
             
             exchange = st.selectbox("Exchange", exchange_options, index=default_idx, key="main_exchange_widget")
         
