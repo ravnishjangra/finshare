@@ -116,7 +116,7 @@ def main():
     if 'current_ticker' not in st.session_state:
         st.session_state['current_ticker'] = "AAPL"
     if 'current_exchange' not in st.session_state:
-        st.session_state['current_exchange'] = "Auto-detect"
+        st.session_state['current_exchange'] = "NSE India (.NS)"
     if 'analyze_clicked' not in st.session_state:
         st.session_state['analyze_clicked'] = False
 
@@ -138,21 +138,12 @@ def main():
             )
         
         with c2:
-            ticker_upper = ticker_input.upper().strip() if ticker_input else ''
-            if ticker_upper in ALL_STOCKS:
-                default_exchange = ALL_STOCKS[ticker_upper][0]
-            elif ticker_upper.endswith('.NS'):
-                default_exchange = "NSE India (.NS)"
-            elif ticker_upper.endswith('.BO'):
-                default_exchange = "BSE India (.BO)"
-            else:
-                # Default to NSE for unknown tickers (most manual entries are Indian stocks)
-                default_exchange = "NSE India (.NS)"
-            
-            exchange_options = ["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"]
-            default_idx = exchange_options.index(default_exchange) if default_exchange in exchange_options else 1
-            
-            exchange = st.selectbox("Exchange", exchange_options, index=default_idx, key="main_exchange_widget")
+            exchange = st.selectbox(
+                "Exchange",
+                ["NSE India (.NS)","BSE India (.BO)","US Market"],
+                index=0,
+                key="main_exchange_widget"
+            )
         
         with c3:
             st.write("")
@@ -160,7 +151,7 @@ def main():
 
         if analyze_btn:
             st.session_state['analyze_clicked'] = True
-            st.session_state['current_ticker'] = ticker_input.upper().strip()
+            st.session_state['current_ticker'] = ticker_input.upper().strip() if ticker_input else ''
             st.session_state['current_exchange'] = exchange
 
         if ticker_input and len(ticker_input) >= 1:
@@ -184,8 +175,8 @@ def main():
             
             with st.spinner(f"🔍 Fetching data for {ticker_to_analyze}..."):
                 try:
-                    em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
-                    analyzer = ProFinancialAnalyzer(ticker_to_analyze, exchange=em.get(exchange_to_use, "Auto"))
+                    em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US"}
+                    analyzer = ProFinancialAnalyzer(ticker_to_analyze, exchange=em.get(exchange_to_use, "NSE"))
                     analyzer.get_live_price()
                     analyzer.fetch_financial_data()
                     analyzer.calculate_all_ratios()
@@ -268,15 +259,15 @@ def main():
         with col1:
             st2_t = st.text_input("Ticker", value=st.session_state.get('current_ticker', 'AAPL'), key="stress_ticker")
         with col2:
-            st2_e = st.selectbox("Exchange", ["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"], key="stress_exchange")
+            st2_e = st.selectbox("Exchange", ["NSE India (.NS)","BSE India (.BO)","US Market"], key="stress_exchange")
         if st.button("🛡️ Run Stress Tests", type="primary", key="stress_btn"):
             if not st2_t:
                 st.warning("Please enter a ticker.")
             else:
                 with st.spinner("Running stress tests..."):
                     try:
-                        em2 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
-                        a2 = ProFinancialAnalyzer(st2_t.strip().upper(), exchange=em2.get(st2_e, "Auto"))
+                        em2 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US"}
+                        a2 = ProFinancialAnalyzer(st2_t.strip().upper(), exchange=em2.get(st2_e, "NSE"))
                         if a2.get_live_price():
                             a2.fetch_financial_data()
                             create_stress_test_dashboard(a2)
@@ -291,15 +282,15 @@ def main():
         with col1:
             ta_t = st.text_input("Ticker", value=st.session_state.get('current_ticker', 'AAPL'), key="ta_ticker")
         with col2:
-            ta_e = st.selectbox("Exchange", ["Auto-detect","NSE India (.NS)","BSE India (.BO)","US Market"], key="ta_exchange")
+            ta_e = st.selectbox("Exchange", ["NSE India (.NS)","BSE India (.BO)","US Market"], key="ta_exchange")
         if st.button("📈 Run Technical Analysis", type="primary", key="ta_btn"):
             if not ta_t:
                 st.warning("Please enter a ticker.")
             else:
                 with st.spinner("Calculating..."):
                     try:
-                        em3 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US","Auto-detect":"Auto"}
-                        a3 = ProFinancialAnalyzer(ta_t.strip().upper(), exchange=em3.get(ta_e, "Auto"))
+                        em3 = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US"}
+                        a3 = ProFinancialAnalyzer(ta_t.strip().upper(), exchange=em3.get(ta_e, "NSE"))
                         if a3.get_live_price():
                             a3.fetch_financial_data()
                             create_technical_dashboard(a3)
