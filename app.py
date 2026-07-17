@@ -146,6 +146,7 @@ def main():
                 key="main_ticker_widget",
                 placeholder="Type any ticker (e.g., AAPL, RELIANCE, VEDL)...",
             )
+            st.caption("💡 Enter ticker symbols, not full names. Use .NS for NSE (TCS.NS, RELIANCE.NS), .BO for BSE, no suffix for US (AAPL, MSFT)")
         
         with c2:
             exchange = st.selectbox(

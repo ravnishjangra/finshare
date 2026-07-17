@@ -12,7 +12,7 @@ from theme import COLORS, style_fig
 def create_portfolio_optimization_tab():
     st.markdown('<div class="section-header">🎯 Portfolio Strategy Comparison</div>', unsafe_allow_html=True)
     st.caption("Compare 6 portfolio construction strategies side-by-side")
-    st.caption("💡 Add .NS for Indian stocks (RELIANCE.NS), .BO for BSE")
+    st.caption("💡 Enter ticker symbols, not full names. Use .NS for NSE (TCS.NS, RELIANCE.NS), .BO for BSE, no suffix for US (AAPL, MSFT)")
     
     presets = {
         "🔧 Custom": [],

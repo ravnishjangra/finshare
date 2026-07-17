@@ -102,7 +102,7 @@ class AdvancedPortfolio:
 def create_advanced_portfolio_tab():
     st.markdown('<div class="section-header">📊 Portfolio Analytics</div>', unsafe_allow_html=True)
     st.caption("Efficient Frontier • Backtesting • Drawdown • Monte Carlo")
-    st.caption("💡 Add .NS for Indian stocks (RELIANCE.NS), .BO for BSE")
+    st.caption("💡 Enter ticker symbols, not full names. Use .NS for NSE (TCS.NS, RELIANCE.NS), .BO for BSE, no suffix for US (AAPL, MSFT)")
     
     presets = {
         "🌟 Magnificent 7": ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA"],
