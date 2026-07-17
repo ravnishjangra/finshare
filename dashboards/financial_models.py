@@ -211,6 +211,20 @@ def create_financial_models_dashboard(analyzer):
                 st.plotly_chart(style_fig(fig), use_container_width=True)
     else:
         st.warning("Insufficient data for DuPont analysis")
+            # Rating legend
+    st.markdown("---")
+    st.markdown("### 📊 Rating Scale")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        st.markdown(f"<div style='background:rgba(16,185,129,0.1);border:1px solid #10b981;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#10b981;font-weight:700;'>🟢 EXCELLENT</span><br><span style='color:#94a3b8;font-size:0.7rem;'>80-100</span></div>", unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"<div style='background:rgba(52,211,153,0.1);border:1px solid #34d399;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#34d399;font-weight:700;'>🟢 GOOD</span><br><span style='color:#94a3b8;font-size:0.7rem;'>60-79</span></div>", unsafe_allow_html=True)
+    with col3:
+        st.markdown(f"<div style='background:rgba(245,158,11,0.1);border:1px solid #f59e0b;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#f59e0b;font-weight:700;'>🟡 FAIR</span><br><span style='color:#94a3b8;font-size:0.7rem;'>40-59</span></div>", unsafe_allow_html=True)
+    with col4:
+        st.markdown(f"<div style='background:rgba(239,68,68,0.1);border:1px solid #f97316;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#f97316;font-weight:700;'>🟠 POOR</span><br><span style='color:#94a3b8;font-size:0.7rem;'>20-39</span></div>", unsafe_allow_html=True)
+    with col5:
+        st.markdown(f"<div style='background:rgba(239,68,68,0.1);border:1px solid #ef4444;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#ef4444;font-weight:700;'>🔴 CRITICAL</span><br><span style='color:#94a3b8;font-size:0.7rem;'>0-19</span></div>", unsafe_allow_html=True)
     
     # ===== SECTION 5: COMPOSITE HEALTH SCORE =====
     st.markdown("### 🏆 Composite Financial Health Score")
