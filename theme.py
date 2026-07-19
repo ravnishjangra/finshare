@@ -20,9 +20,9 @@ COLORS = {
     "border": "rgba(148, 163, 253, 0.10)",
     "border_strong": "rgba(148, 163, 253, 0.22)",
 
-    "accent_1": "#6d5ef8",   # indigo
-    "accent_2": "#9b6bf5",   # violet
-    "accent_3": "#4fd1ff",   # cyan
+    "accent_1": "#6d5ef8",
+    "accent_2": "#9b6bf5",
+    "accent_3": "#4fd1ff",
 
     "up": "#22d38f",
     "up_soft": "rgba(34, 211, 143, 0.15)",
@@ -36,20 +36,17 @@ COLORS = {
     "text_3": "#6b7488",
 }
 
-# Ordered palette for multi-series charts (peer comparisons, factor bars, etc.)
 SERIES_PALETTE = [
     COLORS["accent_1"], COLORS["accent_3"], COLORS["up"],
     COLORS["neutral"], COLORS["accent_2"], COLORS["down"],
     "#5eead4", "#c084fc",
 ]
 
-# Reusable up/down color picker for bars, deltas, candlesticks
 def signed_color(value: float) -> str:
     return COLORS["up"] if value is not None and value >= 0 else COLORS["down"]
 
 
 def sentiment_color(label: str) -> tuple:
-    """Returns (fg_color, soft_bg_color) for a POSITIVE/NEGATIVE/NEUTRAL label."""
     label = (label or "NEUTRAL").upper()
     if label == "POSITIVE":
         return COLORS["up"], COLORS["up_soft"]
@@ -62,8 +59,8 @@ def sentiment_color(label: str) -> tuple:
 PLOTLY_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Manrope, Inter, sans-serif", color=COLORS["text_2"], size=12),
-    title_font=dict(family="Manrope, Inter, sans-serif", color=COLORS["text_1"], size=15),
+    font=dict(family="Arial, sans-serif", color=COLORS["text_2"], size=12),
+    title_font=dict(family="Arial, sans-serif", color=COLORS["text_1"], size=15),
     legend=dict(
         bgcolor="rgba(0,0,0,0)",
         font=dict(color=COLORS["text_2"], size=11),
@@ -85,7 +82,7 @@ PLOTLY_LAYOUT = dict(
     hoverlabel=dict(
         bgcolor=COLORS["surface"],
         bordercolor=COLORS["border_strong"],
-        font=dict(family="Manrope, Inter, sans-serif", color=COLORS["text_1"], size=12),
+        font=dict(family="Arial, sans-serif", color=COLORS["text_1"], size=12),
     ),
     colorway=SERIES_PALETTE,
     bargap=0.28,
@@ -94,26 +91,21 @@ PLOTLY_LAYOUT = dict(
 
 
 def style_fig(fig):
-    """Apply the shared dark theme to any Plotly figure in-place and return it."""
     fig.update_layout(**PLOTLY_LAYOUT)
     return fig
 
 
 def animated_config():
-    """Standard Plotly `config` dict for a cleaner, premium toolbar."""
     return {
         "displayModeBar": "hover",
         "displaylogo": False,
-        "modeBarButtonsToRemove": [
-            "select2d", "lasso2d", "autoScale2d", "toggleSpikelines",
-        ],
+        "modeBarButtonsToRemove": ["select2d", "lasso2d", "autoScale2d", "toggleSpikelines"],
         "toImageButtonOptions": {"format": "png", "scale": 2},
     }
 
 
-# ── HTML snippet helpers (for st.markdown(..., unsafe_allow_html=True)) ───
+# ── HTML snippet helpers ────────────────────────────────────────────────
 def metric_card(label: str, value: str, delta: str = None, positive: bool = True) -> str:
-    """Small stat card matching the .card style in app.py's CSS."""
     delta_html = ""
     if delta:
         color = COLORS["up"] if positive else COLORS["down"]
@@ -140,10 +132,6 @@ def info_box(text: str) -> str:
 
 
 def score_badge(label: str, score: float, max_score: float, thresholds=(0.33, 0.66)) -> str:
-    """
-    Colored badge for 0-N scored models (Piotroski, Altman, etc.).
-    thresholds are fractions of max_score marking weak/moderate/strong cutoffs.
-    """
     frac = 0 if max_score == 0 else score / max_score
     if frac < thresholds[0]:
         color, bg = COLORS["down"], COLORS["down_soft"]
@@ -162,7 +150,6 @@ def score_badge(label: str, score: float, max_score: float, thresholds=(0.33, 0.
 
 
 def sentiment_pill(label: str, score: float = None) -> str:
-    """Small rounded pill showing POSITIVE/NEGATIVE/NEUTRAL, used on news cards."""
     color, bg = sentiment_color(label)
     dot = "●"
     txt = label.title() if label else "Neutral"
@@ -176,7 +163,6 @@ def sentiment_pill(label: str, score: float = None) -> str:
 
 
 def news_card(title: str, source: str, time_ago: str, link: str, label: str = "NEUTRAL", score: float = None) -> str:
-    """Premium news headline card — accent bar, source/time meta row, sentiment pill."""
     color, _ = sentiment_color(label)
     safe_title = title if title else "Untitled"
     href = link or "#"
@@ -195,16 +181,14 @@ def news_card(title: str, source: str, time_ago: str, link: str, label: str = "N
 
 
 def gauge_chart(value: float, title: str = "Sentiment", lo: float = -1.0, hi: float = 1.0):
-    """A premium semicircular gauge (Plotly indicator) for an aggregate score
-    in [lo, hi], colored red→amber→green. Returns a themed go.Figure."""
     import plotly.graph_objects as go
 
     color = COLORS["up"] if value > 0.15 else (COLORS["down"] if value < -0.15 else COLORS["neutral"])
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=value,
-        number={"font": {"color": color, "size": 34, "family": "Manrope, Inter, sans-serif"}, "valueformat": ".2f"},
-        title={"text": title, "font": {"color": COLORS["text_2"], "size": 13}},
+        number={"font": {"color": color, "size": 34, "family": "Arial, sans-serif"}, "valueformat": ".2f"},
+        title={"text": title, "font": {"color": COLORS["text_2"], "size": 13, "family": "Arial, sans-serif"}},
         gauge={
             "axis": {"range": [lo, hi], "tickcolor": COLORS["text_3"], "tickfont": {"color": COLORS["text_3"], "size": 10}},
             "bar": {"color": color, "thickness": 0.28},
