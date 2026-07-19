@@ -22,7 +22,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Finshare Pro", page_icon="📊", layout="wide")
 
-# ===== FONT LOADING (link method - more reliable than @import) =====
+# ===== FONT LOADING =====
 st.markdown("""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -148,6 +148,9 @@ def main():
         </div>
     ''', unsafe_allow_html=True)
 
+    # ===== 3D HERO =====
+    components.html(get_hero_html(height=280), height=280, scrolling=False)
+
     if 'current_ticker' not in st.session_state:
         st.session_state['current_ticker'] = "AAPL"
     if 'current_exchange' not in st.session_state:
@@ -171,8 +174,7 @@ def main():
                 key="main_ticker_widget",
                 placeholder="Type any ticker (e.g., AAPL, RELIANCE, VEDL)...",
             )
-            st.caption("💡 **Exchange tip:** Use US Market for US stocks (AAPL). Use NSE India (.NS) or BSE India (.BO) for Indian stocks. If .NS doesn't work, try .BO — some stocks are only listed on one exchange.")
-            st.caption("💡 Enter ticker symbol (not company name). Examples: AAPL, RELIANCE.NS, TCS.NS, ITC.BO")
+            st.caption("💡 Use ticker symbols (not company names). Add .NS for NSE, .BO for BSE. US stocks need no suffix.")
         
         with c2:
             exchange = st.selectbox(
@@ -264,6 +266,8 @@ def main():
                                 if pdf is not None and not pdf.empty:
                                     st.markdown('<div class="section-header">🏢 Peer Comparison</div>', unsafe_allow_html=True)
                                     st.dataframe(pdf, use_container_width=True, hide_index=True)
+                                    # ===== 3D PEER SCATTER =====
+                                    create_peer_3d_scatter(pdf, main_ticker=analyzer.ticker)
 
                         st.markdown('<div class="section-header">📋 Financial Statements</div>', unsafe_allow_html=True)
                         t1, t2, t3 = st.tabs(["Income", "Balance", "Cash Flow"])
