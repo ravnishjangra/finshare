@@ -75,9 +75,20 @@ class OhlsonOScore:
             # CHIN: (NI - NI_prev) / (|NI| + |NI_prev|)
             chin = (ni - ni_prev) / (abs(ni) + abs(ni_prev)) if (abs(ni) + abs(ni_prev)) > 0 else 0
             
-            # O-Score formula
-            o_score = (-1.32 - 0.407*size + 6.03*tlta - 1.43*wcta + 0.076*clca 
-                      - 2.37*nita - 1.83*futl + 0.285*intwo - 1.72*oeneg - 0.521*chin)
+            # O-Score formula (Ohlson, 1980 coefficients)
+            terms = {
+                'Intercept': -1.32,
+                'Size (-0.407×logTA)': -0.407 * size,
+                'TL/TA (+6.03×)': 6.03 * tlta,
+                'WC/TA (-1.43×)': -1.43 * wcta,
+                'CL/CA (+0.076×)': 0.076 * clca,
+                'NI/TA (-2.37×)': -2.37 * nita,
+                'EBIT/TL (-1.83×)': -1.83 * futl,
+                'Neg NI 2yr (+0.285×)': 0.285 * intwo,
+                'TL>TA (-1.72×)': -1.72 * oeneg,
+                'NI Change (-0.521×)': -0.521 * chin,
+            }
+            o_score = sum(terms.values())
             
             # Convert to probability
             prob = 1 / (1 + np.exp(-o_score))
@@ -111,7 +122,8 @@ class OhlsonOScore:
                     'Negative NI 2yr': intwo,
                     'TL > TA': oeneg,
                     'NI Change': round(chin, 3),
-                }
+                },
+                'contributions': {k: round(v, 3) for k, v in terms.items()},
             }
         except:
             return None

@@ -38,10 +38,20 @@ class BeneishMScore:
             
             dsri = (rec_c/rev_c) / (rec_p/rev_p) if rev_c and rev_p and rec_p else 1
             
-            # 2. Gross Margin Index (GMI)
+            # 2. Gross Margin Index (GMI) = GM(t-1) / GM(t), where GM = Gross Profit / Revenue.
+            # NOTE: previously this incorrectly used (Revenue-GrossProfit)/Revenue (a COGS
+            # margin) instead of the gross margin itself - that inverted the ratio's meaning.
             gp_c = get_val(income_df, ['Gross Profit'], c)
             gp_p = get_val(income_df, ['Gross Profit'], p)
-            gmi = ((rev_p - gp_p)/rev_p) / ((rev_c - gp_c)/rev_c) if rev_c and rev_p and gp_c and gp_p else 1
+            if not gp_c and rev_c:
+                cogs_c = get_val(income_df, ['Cost Of Revenue', 'Cost of Goods Sold', 'Cost of Revenue'], c)
+                gp_c = rev_c - cogs_c if cogs_c else gp_c
+            if not gp_p and rev_p:
+                cogs_p = get_val(income_df, ['Cost Of Revenue', 'Cost of Goods Sold', 'Cost of Revenue'], p)
+                gp_p = rev_p - cogs_p if cogs_p else gp_p
+            gm_c = gp_c / rev_c if rev_c else 0
+            gm_p = gp_p / rev_p if rev_p else 0
+            gmi = gm_p / gm_c if gm_c else 1
             
             # 3. Asset Quality Index (AQI)
             ta_c = get_val(balance_df, ['Total Assets'], c)
@@ -68,10 +78,16 @@ class BeneishMScore:
             sga_p = get_val(income_df, ['Selling General Administrative', 'SG&A Expense'], p)
             sgai = (sga_c/rev_c) / (sga_p/rev_p) if rev_c and rev_p and sga_p else 1
             
-            # 7. Leverage Index (LVGI)
+            # 7. Leverage Index (LVGI) = Leverage(t) / Leverage(t-1), where
+            # Leverage = Total Debt / Total Assets. NOTE: previously this computed
+            # (Debt+Assets)/Assets, which is not a leverage ratio at all - it produced
+            # a number just above 1 regardless of actual debt load and barely moved
+            # year over year, silently muting a real fraud-detection signal.
             td_c = get_val(balance_df, ['Total Debt', 'Long Term Debt'], c)
             td_p = get_val(balance_df, ['Total Debt', 'Long Term Debt'], p)
-            lvgi = ((td_c+ta_c)/ta_c) / ((td_p+ta_p)/ta_p) if ta_c and ta_p else 1
+            lev_c = td_c / ta_c if ta_c else 0
+            lev_p = td_p / ta_p if ta_p else 0
+            lvgi = lev_c / lev_p if lev_p else 1
             
             # 8. Total Accruals to Total Assets (TATA)
             ni_c = get_val(income_df, ['Net Income'], c)
@@ -95,21 +111,36 @@ class BeneishMScore:
                 interpretation = "Financial statements appear reliable."
                 color = '#10b981'
             
+            components = {
+                'DSRI (Receivables)': round(dsri, 2),
+                'GMI (Gross Margin)': round(gmi, 2),
+                'AQI (Asset Quality)': round(aqi, 2),
+                'SGI (Sales Growth)': round(sgi, 2),
+                'DEPI (Depreciation)': round(depi, 2),
+                'SGAI (SG&A)': round(sgai, 2),
+                'LVGI (Leverage)': round(lvgi, 2),
+                'TATA (Accruals)': round(tata, 4),
+            }
+
+            # A component index materially above 1.0 (roughly >1.2, the rule-of-thumb
+            # threshold used in the Beneish literature) signals that ratio moved in the
+            # manipulation-consistent direction year over year. TATA is on a different
+            # scale (a fraction of total assets, not an index around 1) so it uses its
+            # own threshold instead.
+            flags = {}
+            for name, val in components.items():
+                if name.startswith('TATA'):
+                    flags[name] = 'elevated' if val > 0.03 else 'normal'
+                else:
+                    flags[name] = 'elevated' if val > 1.2 else 'normal'
+
             return {
                 'm_score': round(m_score, 2),
                 'risk': risk,
                 'color': color,
                 'interpretation': interpretation,
-                'components': {
-                    'DSRI (Receivables)': round(dsri, 2),
-                    'GMI (Gross Margin)': round(gmi, 2),
-                    'AQI (Asset Quality)': round(aqi, 2),
-                    'SGI (Sales Growth)': round(sgi, 2),
-                    'DEPI (Depreciation)': round(depi, 2),
-                    'SGAI (SG&A)': round(sgai, 2),
-                    'LVGI (Leverage)': round(lvgi, 2),
-                    'TATA (Accruals)': round(tata, 4),
-                }
+                'components': components,
+                'flags': flags,
             }
         except:
             return None
