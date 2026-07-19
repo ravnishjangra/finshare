@@ -37,8 +37,6 @@ def create_peer_3d_scatter(pdf: pd.DataFrame, main_ticker: str = None):
     main_ticker_clean = (main_ticker or "").replace(".NS", "").replace(".BO", "")
     is_main = plot_df["Ticker"] == main_ticker_clean
     sizes = [16 if m else 9 for m in is_main]
-    line_widths = [2.5 if m else 1 for m in is_main]
-    line_colors = [COLORS["accent_3"] if m else COLORS["bg_1"] for m in is_main]
 
     st.markdown('<div class="section-header">🧊 3D Peer Landscape</div>', unsafe_allow_html=True)
     st.caption("Valuation (P/E) × Quality (ROE %) × Leverage (D/E), colored by dividend yield — your stock highlighted in cyan")
@@ -54,7 +52,7 @@ def create_peer_3d_scatter(pdf: pd.DataFrame, main_ticker: str = None):
             color=plot_df["DivY_num"],
             colorscale=[[0.0, COLORS["accent_1"]], [0.5, COLORS["accent_2"]], [1.0, COLORS["up"]]],
             colorbar=dict(title="Div Yld %", tickfont=dict(color=COLORS["text_3"]), len=0.65),
-            line=dict(width=line_widths, color=line_colors),
+            line=dict(width=1.5, color=COLORS["bg_1"]),
             opacity=0.9,
         ),
         customdata=plot_df["Company"],
