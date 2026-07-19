@@ -21,7 +21,7 @@ st.set_page_config(page_title="Finshare Pro", page_icon="📊", layout="wide")
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
     :root {
         --bg-0: #05070d; --bg-1: #0a0e17; --bg-2: #10141f;
         --surface: #131826; --surface-hover: #171d2e;
@@ -34,7 +34,7 @@ st.markdown("""
         --text-1: #f4f6fb; --text-2: #aab1c5; --text-3: #6b7488;
         --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px;
         --shadow-lift: 0 18px 40px rgba(3, 5, 12, 0.55);
-        --font-display: 'Manrope', 'Inter', sans-serif;
+        --font-display: 'Inter', sans-serif;
         --font-body: 'Inter', sans-serif;
         --font-mono: 'JetBrains Mono', monospace;
     }
