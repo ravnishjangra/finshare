@@ -1,6 +1,7 @@
 """Financial Models Dashboard - Performance, Beneish, DuPont, Composite, Ohlson, Fear & Greed"""
 import streamlit as st
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 from models.beneish import BeneishMScore
@@ -101,6 +102,73 @@ def create_financial_models_dashboard(analyzer):
             c2.metric("VaR 99%", f"{perf['var_99']}%", delta_color="inverse")
             c3.metric("CVaR 95%", f"{perf['cvar_95']}%", delta_color="inverse")
             c4.metric("Win/Loss Ratio", f"{perf['win_loss_ratio']}")
+
+        # ── Visualizations: risk-adjusted ratio comparison + underwater chart ──
+        chart_col1, chart_col2 = st.columns(2)
+
+        with chart_col1:
+            ratio_names = ['Sharpe', 'Sortino', 'Treynor', 'Info Ratio', 'Calmar']
+            ratio_vals = [perf['sharpe_ratio'], perf['sortino_ratio'], perf['treynor_ratio'],
+                          perf['information_ratio'], perf['calmar_ratio']]
+            ratio_colors = [COLORS['up'] if v >= 0 else COLORS['down'] for v in ratio_vals]
+
+            fig = go.Figure(go.Bar(
+                x=ratio_vals, y=ratio_names, orientation='h',
+                marker=dict(color=ratio_colors, line=dict(color=COLORS['border_strong'], width=1)),
+                text=[f"{v:.2f}" for v in ratio_vals], textposition='outside',
+                textfont=dict(color=COLORS['text_1'], size=12),
+            ))
+            fig.add_vline(x=0, line_color=COLORS['border_strong'], line_width=1)
+            fig.update_layout(
+                title="Risk-Adjusted Ratios",
+                height=280, margin=dict(l=10, r=30, t=45, b=20),
+                xaxis=dict(title="Ratio Value", zeroline=True),
+                yaxis=dict(autorange='reversed'),
+                showlegend=False,
+            )
+            st.plotly_chart(style_fig(fig), use_container_width=True)
+
+        with chart_col2:
+            close = prices['Close']
+            rets = close.pct_change().dropna()
+            cum = (1 + rets).cumprod()
+            running_max = cum.expanding().max()
+            underwater = (cum - running_max) / running_max * 100
+
+            fig = go.Figure(go.Scatter(
+                x=underwater.index, y=underwater.values, mode='lines',
+                line=dict(color=COLORS['down'], width=1.5),
+                fill='tozeroy', fillcolor='rgba(255,93,122,0.18)',
+                name='Drawdown',
+                hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>',
+            ))
+            fig.update_layout(
+                title=f"Underwater Chart (Max DD: {perf['max_drawdown']}%)",
+                height=280, margin=dict(l=10, r=20, t=45, b=20),
+                yaxis=dict(title="Drawdown %", ticksuffix="%"),
+                showlegend=False,
+            )
+            st.plotly_chart(style_fig(fig), use_container_width=True)
+
+        # Returns distribution with VaR/CVaR markers
+        with st.expander("📉 Daily Returns Distribution", expanded=False):
+            close = prices['Close']
+            rets = (close.pct_change().dropna() * 100)
+            fig = go.Figure()
+            fig.add_trace(go.Histogram(
+                x=rets, nbinsx=60, marker=dict(color=COLORS['accent_1'], opacity=0.75),
+                name='Daily Returns',
+            ))
+            fig.add_vline(x=perf['var_95']/ (252**0.5), line_dash='dash', line_color=COLORS['neutral'],
+                          annotation_text="VaR 95% (daily-scale)", annotation_font_color=COLORS['neutral'])
+            fig.add_vline(x=0, line_color=COLORS['border_strong'], line_width=1)
+            fig.update_layout(
+                height=280, margin=dict(l=20, r=20, t=20, b=20),
+                xaxis=dict(title="Daily Return %"), yaxis=dict(title="Frequency"),
+                showlegend=False, bargap=0.02,
+            )
+            st.plotly_chart(style_fig(fig), use_container_width=True)
+            st.caption("VaR/CVaR figures above are annualized (√252-scaled); the dashed line here rescales VaR 95% back to a single-day magnitude for comparison against the daily histogram.")
     
     # ===== SECTION 3: EARNINGS QUALITY =====
     st.markdown("### 🔍 Earnings Quality & Fraud Detection")
@@ -114,10 +182,29 @@ def create_financial_models_dashboard(analyzer):
         if m_score:
             st.markdown(f"<h2 style='color:{m_score['color']};text-align:center;'>{m_score['m_score']}</h2>", unsafe_allow_html=True)
             st.markdown(f"<p style='text-align:center;color:{m_score['color']};'><b>{m_score['risk']}</b></p>", unsafe_allow_html=True)
-            with st.expander("📋 Components"):
+            with st.expander("📋 Components", expanded=False):
                 st.caption(m_score['interpretation'])
-                for k, v in m_score['components'].items():
-                    st.caption(f"• {k}: {v}")
+                comps = m_score['components']
+                flags = m_score.get('flags', {})
+                names = list(comps.keys())
+                vals = list(comps.values())
+                bar_colors = [COLORS['down'] if flags.get(n) == 'elevated' else COLORS['accent_3'] for n in names]
+                fig = go.Figure(go.Bar(
+                    x=vals, y=names, orientation='h',
+                    marker=dict(color=bar_colors, line=dict(color=COLORS['border_strong'], width=1)),
+                    text=[f"{v:.2f}" for v in vals], textposition='outside',
+                    textfont=dict(color=COLORS['text_1'], size=11),
+                ))
+                fig.add_vline(x=1.0, line_dash='dash', line_color=COLORS['text_3'],
+                              annotation_text="baseline = 1.0", annotation_font_size=10,
+                              annotation_font_color=COLORS['text_3'])
+                fig.update_layout(
+                    height=300, margin=dict(l=10, r=40, t=10, b=20),
+                    xaxis=dict(title="Index Value (1.0 = no YoY change)"),
+                    yaxis=dict(autorange='reversed'), showlegend=False,
+                )
+                st.plotly_chart(style_fig(fig), use_container_width=True)
+                st.caption("🔴 Red bars = elevated (>1.2, or TATA > 3%) — moved in the direction associated with earnings manipulation.")
         else:
             st.warning("Insufficient data")
     
@@ -147,7 +234,28 @@ def create_financial_models_dashboard(analyzer):
             st.markdown(f"<h2 style='color:{o_score['color']};text-align:center;'>{o_score['probability']}</h2>", unsafe_allow_html=True)
             st.markdown(f"<p style='text-align:center;color:{o_score['color']};'><b>{o_score['risk']}</b></p>", unsafe_allow_html=True)
             st.caption(o_score['interpretation'])
-            with st.expander("📋 Components"):
+            with st.expander("📋 Score Contribution Breakdown", expanded=False):
+                contrib = o_score.get('contributions', {})
+                if contrib:
+                    names = list(contrib.keys()) + ['= O-Score']
+                    vals = list(contrib.values()) + [0]
+                    fig = go.Figure(go.Waterfall(
+                        orientation='v',
+                        measure=['relative'] * (len(names) - 1) + ['total'],
+                        x=names,
+                        y=vals,
+                        connector={'line': {'color': COLORS['text_3']}},
+                        increasing={'marker': {'color': COLORS['down']}},
+                        decreasing={'marker': {'color': COLORS['up']}},
+                        totals={'marker': {'color': COLORS['accent_1']}},
+                    ))
+                    fig.update_layout(
+                        height=340, margin=dict(l=10, r=10, t=10, b=90),
+                        xaxis=dict(tickangle=-35, tickfont=dict(size=10)),
+                        yaxis=dict(title="Contribution to O-Score"), showlegend=False,
+                    )
+                    st.plotly_chart(style_fig(fig), use_container_width=True)
+                    st.caption("Each bar is the exact weighted contribution of that factor to the O-Score (they sum to the total). Red = pushes distress risk up, green = pushes it down.")
                 for k, v in o_score['components'].items():
                     st.caption(f"• {k}: {v}")
         else:
@@ -155,65 +263,90 @@ def create_financial_models_dashboard(analyzer):
     
     # ===== SECTION 4: DUPONT ANALYSIS =====
     st.markdown("### 🧩 DuPont ROE Decomposition")
-    
+    st.caption("ROE = Net Margin × Asset Turnover × Equity Multiplier — a multiplicative identity, so factors are shown as trend lines and an exact YoY bridge rather than a summed waterfall.")
+
     dupont = DuPontAnalysis.calculate(income, balance, ratios)
-    
+
     if dupont:
+        t3 = dupont['three_step']
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Net Profit Margin", f"{t3['net_margin']}%")
+        m2.metric("Asset Turnover", f"{t3['asset_turnover']}x")
+        m3.metric("Equity Multiplier", f"{t3['equity_multiplier']}x")
+        m4.metric("ROE (3-Step)", f"{t3['roe']}%")
+
+        if dupont.get('five_step'):
+            t5 = dupont['five_step']
+            st.caption(
+                f"5-Step: Tax Burden {t5['tax_burden']} × Interest Burden {t5['interest_burden']} × "
+                f"Operating Margin {t5['operating_margin']}% × Asset Turnover {t5['asset_turnover']}x × "
+                f"Equity Multiplier {t5['equity_multiplier']}x = ROE {t5['roe']}%"
+            )
+
         col1, col2 = st.columns(2)
-        
+
+        # ── Multi-year trend: each driver on its own normalized axis ──
         with col1:
-            st.markdown(f"**3-Step DuPont: ROE = {dupont['three_step']['roe']}%**")
-            st.caption(f"Net Profit Margin: {dupont['three_step']['net_margin']}%")
-            st.caption(f"× Asset Turnover: {dupont['three_step']['asset_turnover']}")
-            st.caption(f"× Equity Multiplier: {dupont['three_step']['equity_multiplier']}")
-            st.caption(f"= **ROE: {dupont['three_step']['roe']}%**")
-            
-            fig = go.Figure(go.Waterfall(
-                name="3-Step DuPont", orientation="v",
-                measure=["relative", "relative", "relative", "total"],
-                x=["Net Margin", "× Asset Turnover", "× Equity Multiplier", "= ROE"],
-                y=[dupont['three_step']['net_margin'],
-                   dupont['three_step']['asset_turnover'] * 100,
-                   dupont['three_step']['equity_multiplier'] * 10,
-                   dupont['three_step']['roe']],
-                connector={"line": {"color": COLORS['text_3']}},
-                increasing={"marker": {"color": COLORS['accent_1']}},
-                decreasing={"marker": {"color": COLORS['down']}},
-                totals={"marker": {"color": COLORS['up']}},
-            ))
-            fig.update_layout(height=280, margin=dict(t=10))
-            st.plotly_chart(style_fig(fig), use_container_width=True)
-        
-        with col2:
-            if dupont.get('five_step'):
-                st.markdown(f"**5-Step DuPont: ROE = {dupont['five_step']['roe']}%**")
-                st.caption(f"Tax Burden: {dupont['five_step']['tax_burden']}")
-                st.caption(f"× Interest Burden: {dupont['five_step']['interest_burden']}")
-                st.caption(f"× Operating Margin: {dupont['five_step']['operating_margin']}%")
-                st.caption(f"× Asset Turnover: {dupont['five_step']['asset_turnover']}")
-                st.caption(f"× Equity Multiplier: {dupont['five_step']['equity_multiplier']}")
-                st.caption(f"= **ROE: {dupont['five_step']['roe']}%**")
-                
-                fig = go.Figure(go.Waterfall(
-                    name="5-Step DuPont", orientation="v",
-                    measure=["relative", "relative", "relative", "relative", "relative", "total"],
-                    x=["Tax", "Interest", "Op Margin", "Asset TO", "Equity Mult", "= ROE"],
-                    y=[dupont['five_step']['tax_burden']*100,
-                       dupont['five_step']['interest_burden']*100,
-                       dupont['five_step']['operating_margin'],
-                       dupont['five_step']['asset_turnover']*100,
-                       dupont['five_step']['equity_multiplier']*10,
-                       dupont['five_step']['roe']],
-                    connector={"line": {"color": COLORS['text_3']}},
-                    increasing={"marker": {"color": COLORS['accent_1']}},
-                    decreasing={"marker": {"color": COLORS['down']}},
-                    totals={"marker": {"color": COLORS['up']}},
-                ))
-                fig.update_layout(height=280, margin=dict(t=10))
+            trend = dupont.get('trend')
+            if trend and len(trend['labels']) >= 2:
+                st.markdown("**Multi-Year Driver Trends**")
+                fig = make_subplots(specs=[[{"secondary_y": True}]])
+                fig.add_trace(go.Scatter(
+                    x=trend['labels'], y=trend['net_margin'], name='Net Margin %',
+                    line=dict(color=COLORS['accent_1'], width=2.5), mode='lines+markers',
+                ), secondary_y=False)
+                fig.add_trace(go.Scatter(
+                    x=trend['labels'], y=trend['roe'], name='ROE %',
+                    line=dict(color=COLORS['up'], width=2.5, dash='dot'), mode='lines+markers',
+                ), secondary_y=False)
+                fig.add_trace(go.Bar(
+                    x=trend['labels'], y=trend['asset_turnover'], name='Asset Turnover (x)',
+                    marker=dict(color='rgba(79,209,255,0.35)'),
+                ), secondary_y=True)
+                fig.add_trace(go.Bar(
+                    x=trend['labels'], y=trend['equity_multiplier'], name='Equity Multiplier (x)',
+                    marker=dict(color='rgba(155,107,245,0.35)'),
+                ), secondary_y=True)
+                fig.update_layout(
+                    height=320, margin=dict(l=10, r=10, t=20, b=10), barmode='group',
+                    legend=dict(orientation='h', y=-0.2),
+                )
+                fig.update_yaxes(title_text="Margin / ROE %", secondary_y=False)
+                fig.update_yaxes(title_text="Turnover / Multiplier (x)", secondary_y=True)
                 st.plotly_chart(style_fig(fig), use_container_width=True)
+            else:
+                st.info("Need 2+ years of statements for a trend chart.")
+
+        # ── ROE bridge: exact additive attribution of the YoY ROE change ──
+        with col2:
+            bridge = dupont.get('bridge')
+            if bridge:
+                st.markdown(f"**ROE Bridge: {bridge['start_label']} → {bridge['end_label']}**")
+                names = ['ROE ' + bridge['start_label'], 'Margin Effect', 'Turnover Effect', 'Leverage Effect', 'ROE ' + bridge['end_label']]
+                measures = ['absolute', 'relative', 'relative', 'relative', 'total']
+                values = [bridge['roe_start'], bridge['margin_effect'], bridge['turnover_effect'], bridge['leverage_effect'], 0]
+
+                fig = go.Figure(go.Waterfall(
+                    orientation='v', measure=measures, x=names, y=values,
+                    connector={'line': {'color': COLORS['text_3']}},
+                    increasing={'marker': {'color': COLORS['up']}},
+                    decreasing={'marker': {'color': COLORS['down']}},
+                    totals={'marker': {'color': COLORS['accent_1']}},
+                    text=[f"{v:+.2f}%" if m == 'relative' else f"{v:.2f}%" for v, m in zip(
+                        [bridge['roe_start'], bridge['margin_effect'], bridge['turnover_effect'], bridge['leverage_effect'], bridge['roe_end']],
+                        measures)],
+                    textposition='outside',
+                ))
+                fig.update_layout(height=320, margin=dict(l=10, r=10, t=20, b=10), showlegend=False,
+                                   yaxis=dict(title="ROE %"))
+                st.plotly_chart(style_fig(fig), use_container_width=True)
+                st.caption("Exact sequential-substitution decomposition — the three effects sum precisely to the change in ROE.")
+            else:
+                st.info("Need 2+ years of statements for a YoY ROE bridge.")
     else:
         st.warning("Insufficient data for DuPont analysis")
-            # Rating legend
+    
+    # Rating legend
     st.markdown("---")
     st.markdown("### 📊 Rating Scale")
     col1, col2, col3, col4, col5 = st.columns(5)
