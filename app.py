@@ -166,6 +166,7 @@ def main():
                 placeholder="Type any ticker (e.g., AAPL, RELIANCE, VEDL)...",
             )
             st.caption("💡 **Exchange tip:** Use US Market for US stocks (AAPL). Use NSE India (.NS) or BSE India (.BO) for Indian stocks. If .NS doesn't work, try .BO — some stocks are only listed on one exchange.")
+            st.caption("💡 Enter ticker symbol (not company name). Examples: AAPL, RELIANCE.NS, TCS.NS, ITC.BO")
         
         with c2:
             exchange = st.selectbox(
@@ -299,6 +300,7 @@ def main():
 
     with tab2:
         st.markdown("### 🛡️ Stress Tests")
+        st.caption("💡 Use ticker symbols: AAPL, RELIANCE.NS, TCS.NS, ITC.BO")
         col1, col2 = st.columns([2, 1])
         with col1:
             st2_t = st.text_input("Ticker", value=st.session_state.get('current_ticker', 'AAPL'), key="stress_ticker")
@@ -320,6 +322,7 @@ def main():
 
     with tab3:
         st.markdown("### 📈 Technical Analysis")
+        st.caption("💡 Use ticker symbols: AAPL, RELIANCE.NS, TCS.NS, ITC.BO")
         col1, col2 = st.columns([2, 1])
         with col1:
             ta_t = st.text_input("Ticker", value=st.session_state.get('current_ticker', 'AAPL'), key="ta_ticker")
@@ -340,9 +343,11 @@ def main():
                         st.error("Could not fetch data. Try again.")
 
     with tab4:
+        st.caption("💡 Use ticker symbols: AAPL, RELIANCE.NS, TCS.NS, ITC.BO")
         create_portfolio_optimization_tab()
 
     with tab5:
+        st.caption("💡 Use ticker symbols: AAPL, RELIANCE.NS, TCS.NS, ITC.BO")
         create_advanced_portfolio_tab()
 
     st.divider()
