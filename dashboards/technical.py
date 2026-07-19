@@ -1,9 +1,58 @@
-"""Technical Analysis Dashboard"""
+"""Technical Analysis Dashboard
+
+Covers trend (SMA/EMA, Bollinger Bands, Golden/Death Cross), momentum
+(RSI, MACD, Stochastic Oscillator), trend strength (ADX/DMI), and — new —
+volume (volume bars + volume MA + On-Balance Volume) and volatility
+(ATR%, rolling annualized historical volatility, Bollinger Band width).
+No external TA library is used (none is in requirements.txt), so every
+indicator below is computed directly from OHLCV with pandas/numpy.
+"""
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
+import pandas as pd
 from theme import COLORS, style_fig
+
+
+def _wilder_smooth(series, period):
+    """Wilder's smoothing (used by RSI/ATR/ADX) - an EMA variant with alpha=1/period."""
+    return series.ewm(alpha=1 / period, adjust=False).mean()
+
+
+def _compute_adx(high, low, close, period=14):
+    up_move = high.diff()
+    down_move = -low.diff()
+    plus_dm = pd.Series(np.where((up_move > down_move) & (up_move > 0), up_move, 0.0), index=high.index)
+    minus_dm = pd.Series(np.where((down_move > up_move) & (down_move > 0), down_move, 0.0), index=high.index)
+
+    prev_close = close.shift(1)
+    tr = pd.concat([
+        (high - low),
+        (high - prev_close).abs(),
+        (low - prev_close).abs(),
+    ], axis=1).max(axis=1)
+
+    atr = _wilder_smooth(tr, period)
+    plus_di = 100 * _wilder_smooth(plus_dm, period) / atr.replace(0, np.nan)
+    minus_di = 100 * _wilder_smooth(minus_dm, period) / atr.replace(0, np.nan)
+    dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
+    adx = _wilder_smooth(dx.fillna(0), period)
+    return plus_di, minus_di, adx, atr
+
+
+def _compute_stochastic(high, low, close, k_period=14, d_period=3):
+    lowest_low = low.rolling(k_period).min()
+    highest_high = high.rolling(k_period).max()
+    percent_k = 100 * (close - lowest_low) / (highest_high - lowest_low).replace(0, np.nan)
+    percent_d = percent_k.rolling(d_period).mean()
+    return percent_k, percent_d
+
+
+def _compute_obv(close, volume):
+    direction = np.sign(close.diff().fillna(0))
+    return (direction * volume).fillna(0).cumsum()
+
 
 def create_technical_dashboard(analyzer):
     st.markdown('<div class="section-header">📈 Technical Analysis</div>', unsafe_allow_html=True)
@@ -11,54 +60,149 @@ def create_technical_dashboard(analyzer):
     if prices is None or prices.empty:
         st.warning("No price data.")
         return
-    
+
     close = prices['Close']
+    high = prices['High'] if 'High' in prices.columns else close
+    low = prices['Low'] if 'Low' in prices.columns else close
+    volume = prices['Volume'] if 'Volume' in prices.columns else pd.Series(0, index=close.index)
     cur = analyzer.currency_symbol
-    
+
+    # ── Momentum: RSI ──
     delta = close.diff()
     gain = (delta.where(delta > 0, 0)).rolling(14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-    rsi = 100 - (100 / (1 + gain/loss))
-    
+    rsi = 100 - (100 / (1 + gain / loss))
+
+    # ── Momentum: MACD ──
     ema12 = close.ewm(span=12).mean()
     ema26 = close.ewm(span=26).mean()
     macd = ema12 - ema26
     signal = macd.ewm(span=9).mean()
     hist = macd - signal
-    
+
+    # ── Momentum: Stochastic Oscillator ──
+    stoch_k, stoch_d = _compute_stochastic(high, low, close)
+
+    # ── Trend: SMA/EMA + Bollinger Bands ──
     sma20 = close.rolling(20).mean()
     std20 = close.rolling(20).std()
-    upper = sma20 + 2*std20
-    lower = sma20 - 2*std20
-    
+    upper = sma20 + 2 * std20
+    lower = sma20 - 2 * std20
+    bb_width_pct = ((upper - lower) / sma20 * 100)
+
+    sma50 = close.rolling(50).mean()
+    sma200 = close.rolling(200).mean()
+
+    # ── Trend Strength: ADX/DMI ──
+    plus_di, minus_di, adx, atr = _compute_adx(high, low, close)
+    atr_pct = (atr / close * 100)
+
+    # ── Volatility: rolling annualized historical volatility ──
+    daily_ret = close.pct_change()
+    hist_vol_20 = daily_ret.rolling(20).std() * np.sqrt(252) * 100
+
+    # ── Volume: volume MA + OBV ──
+    vol_ma20 = volume.rolling(20).mean()
+    obv = _compute_obv(close, volume)
+
+    # ── Headline metrics ──
     rsi_now = rsi.iloc[-1]
     macd_sig = "Bullish 🟢" if macd.iloc[-1] > signal.iloc[-1] else "Bearish 🔴"
-    sma50 = close.rolling(50).mean().iloc[-1]
-    sma200 = close.rolling(200).mean().iloc[-1]
-    trend = "Golden Cross ✨" if sma50 > sma200 else "Death Cross 💀"
-    
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("RSI (14)", f"{rsi_now:.1f}")
+    trend = "Golden Cross ✨" if sma50.iloc[-1] > sma200.iloc[-1] else "Death Cross 💀"
+    adx_now = adx.iloc[-1] if pd.notna(adx.iloc[-1]) else 0
+    adx_strength = "Strong" if adx_now > 25 else ("Weak/Range" if adx_now < 20 else "Developing")
+    vol_ratio = (volume.iloc[-1] / vol_ma20.iloc[-1]) if vol_ma20.iloc[-1] else 1
+    stoch_now = stoch_k.iloc[-1] if pd.notna(stoch_k.iloc[-1]) else 50
+
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1.metric("RSI (14)", f"{rsi_now:.1f}", "Overbought" if rsi_now > 70 else ("Oversold" if rsi_now < 30 else "Neutral"))
     col2.metric("MACD", f"{macd.iloc[-1]:.2f}", delta=macd_sig)
-    col3.metric("Trend", trend.split(' ')[0])
-    col4.metric("Close", f"{cur}{close.iloc[-1]:.2f}")
-    
-    idx = slice(-120, None)
-    fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.5,0.25,0.25])
-    
-    fig.add_trace(go.Scatter(x=close.index[idx], y=upper.iloc[idx], line=dict(color=COLORS['text_3'],width=1,dash='dash'), name='Upper BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=sma20.iloc[idx], line=dict(color=COLORS['neutral'],width=1.5), name='20 MA'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=lower.iloc[idx], line=dict(color=COLORS['text_3'],width=1,dash='dash'), fill='tonexty', fillcolor='rgba(109,94,248,0.06)', name='Lower BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=close.iloc[idx], line=dict(color=COLORS['accent_1'],width=2), name='Price'), row=1, col=1)
-    
-    fig.add_trace(go.Scatter(x=rsi.index[idx], y=rsi.iloc[idx], line=dict(color=COLORS['accent_3'],width=2), name='RSI'), row=2, col=1)
-    fig.add_hline(y=70, line_dash="dash", line_color=COLORS['down'], row=2, col=1)
-    fig.add_hline(y=30, line_dash="dash", line_color=COLORS['up'], row=2, col=1)
-    
-    fig.add_trace(go.Scatter(x=macd.index[idx], y=macd.iloc[idx], line=dict(color=COLORS['accent_1'],width=2), name='MACD'), row=3, col=1)
-    fig.add_trace(go.Scatter(x=signal.index[idx], y=signal.iloc[idx], line=dict(color=COLORS['neutral'],width=1.5), name='Signal'), row=3, col=1)
-    colors = [COLORS['up'] if h >= 0 else COLORS['down'] for h in hist.iloc[idx]]
-    fig.add_trace(go.Bar(x=hist.index[idx], y=hist.iloc[idx], marker_color=colors, name='Histogram'), row=3, col=1)
-    
-    fig.update_layout(height=750, hovermode='x unified')
+    col3.metric("Stochastic %K", f"{stoch_now:.0f}", "Overbought" if stoch_now > 80 else ("Oversold" if stoch_now < 20 else "Neutral"))
+    col4.metric("ADX (14)", f"{adx_now:.1f}", adx_strength)
+    col5.metric("ATR (14)", f"{atr_pct.iloc[-1]:.2f}%", "of price")
+    col6.metric("Volume vs 20D Avg", f"{vol_ratio:.2f}x", "Elevated" if vol_ratio > 1.5 else "Normal")
+
+    col7, col8, col9 = st.columns(3)
+    col7.metric("Trend (50/200 SMA)", trend.split(' ')[0])
+    col8.metric("Hist. Volatility (20D, ann.)", f"{hist_vol_20.iloc[-1]:.1f}%")
+    col9.metric("Close", f"{cur}{close.iloc[-1]:.2f}")
+
+    idx = slice(-180, None)
+
+    fig = make_subplots(
+        rows=6, cols=1, shared_xaxes=True, vertical_spacing=0.025,
+        row_heights=[0.28, 0.13, 0.13, 0.13, 0.13, 0.20],
+        subplot_titles=("Price & Bollinger Bands", "Volume & On-Balance Volume", "RSI (14)",
+                         "Stochastic Oscillator (14,3)", "MACD (12,26,9)", "ATR% & Historical Volatility"),
+    )
+
+    # Row 1: Price + BB
+    fig.add_trace(go.Scatter(x=close.index[idx], y=upper.iloc[idx], line=dict(color=COLORS['text_3'], width=1, dash='dash'), name='Upper BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=close.index[idx], y=sma20.iloc[idx], line=dict(color=COLORS['neutral'], width=1.5), name='20 MA'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=close.index[idx], y=lower.iloc[idx], line=dict(color=COLORS['text_3'], width=1, dash='dash'), fill='tonexty', fillcolor='rgba(109,94,248,0.06)', name='Lower BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=close.index[idx], y=sma50.iloc[idx], line=dict(color=COLORS['accent_2'], width=1, dash='dot'), name='50 SMA'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=close.index[idx], y=close.iloc[idx], line=dict(color=COLORS['accent_1'], width=2), name='Price'), row=1, col=1)
+
+    # Row 2: Volume + OBV (secondary axis via a twin trace using normalized OBV)
+    vol_colors = [COLORS['up'] if c >= o else COLORS['down'] for c, o in zip(close.iloc[idx], prices['Open'].iloc[idx] if 'Open' in prices.columns else close.iloc[idx])]
+    fig.add_trace(go.Bar(x=volume.index[idx], y=volume.iloc[idx], marker_color=vol_colors, name='Volume', opacity=0.7), row=2, col=1)
+    fig.add_trace(go.Scatter(x=vol_ma20.index[idx], y=vol_ma20.iloc[idx], line=dict(color=COLORS['neutral'], width=1.5), name='Vol 20D Avg'), row=2, col=1)
+
+    # Row 3: RSI
+    fig.add_trace(go.Scatter(x=rsi.index[idx], y=rsi.iloc[idx], line=dict(color=COLORS['accent_3'], width=2), name='RSI'), row=3, col=1)
+    fig.add_hline(y=70, line_dash="dash", line_color=COLORS['down'], row=3, col=1)
+    fig.add_hline(y=30, line_dash="dash", line_color=COLORS['up'], row=3, col=1)
+
+    # Row 4: Stochastic
+    fig.add_trace(go.Scatter(x=stoch_k.index[idx], y=stoch_k.iloc[idx], line=dict(color=COLORS['accent_1'], width=1.8), name='%K'), row=4, col=1)
+    fig.add_trace(go.Scatter(x=stoch_d.index[idx], y=stoch_d.iloc[idx], line=dict(color=COLORS['neutral'], width=1.5, dash='dot'), name='%D'), row=4, col=1)
+    fig.add_hline(y=80, line_dash="dash", line_color=COLORS['down'], row=4, col=1)
+    fig.add_hline(y=20, line_dash="dash", line_color=COLORS['up'], row=4, col=1)
+
+    # Row 5: MACD
+    fig.add_trace(go.Scatter(x=macd.index[idx], y=macd.iloc[idx], line=dict(color=COLORS['accent_1'], width=2), name='MACD'), row=5, col=1)
+    fig.add_trace(go.Scatter(x=signal.index[idx], y=signal.iloc[idx], line=dict(color=COLORS['neutral'], width=1.5), name='Signal'), row=5, col=1)
+    macd_colors = [COLORS['up'] if h >= 0 else COLORS['down'] for h in hist.iloc[idx]]
+    fig.add_trace(go.Bar(x=hist.index[idx], y=hist.iloc[idx], marker_color=macd_colors, name='Histogram'), row=5, col=1)
+
+    # Row 6: ATR% + Historical Volatility
+    fig.add_trace(go.Scatter(x=atr_pct.index[idx], y=atr_pct.iloc[idx], line=dict(color=COLORS['accent_3'], width=1.8), name='ATR %', fill='tozeroy', fillcolor='rgba(79,209,255,0.08)'), row=6, col=1)
+    fig.add_trace(go.Scatter(x=hist_vol_20.index[idx], y=hist_vol_20.iloc[idx], line=dict(color=COLORS['accent_2'], width=1.8, dash='dot'), name='Hist. Vol (ann.) %'), row=6, col=1)
+
+    fig.update_layout(height=1150, hovermode='x unified', legend=dict(orientation='h', y=1.02))
+    fig.update_yaxes(title_text="Price", row=1, col=1)
+    fig.update_yaxes(title_text="Shares", row=2, col=1)
+    fig.update_yaxes(title_text="RSI", range=[0, 100], row=3, col=1)
+    fig.update_yaxes(title_text="Stoch", range=[0, 100], row=4, col=1)
+    fig.update_yaxes(title_text="MACD", row=5, col=1)
+    fig.update_yaxes(title_text="%", row=6, col=1)
     st.plotly_chart(style_fig(fig), use_container_width=True)
+
+    # ── ADX / DMI trend-strength panel (separate, since it's a distinct read from momentum) ──
+    with st.expander("📐 ADX / Directional Movement Index (Trend Strength)", expanded=False):
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=adx.index[idx], y=adx.iloc[idx], line=dict(color=COLORS['accent_1'], width=2.2), name='ADX'))
+        fig2.add_trace(go.Scatter(x=plus_di.index[idx], y=plus_di.iloc[idx], line=dict(color=COLORS['up'], width=1.5), name='+DI'))
+        fig2.add_trace(go.Scatter(x=minus_di.index[idx], y=minus_di.iloc[idx], line=dict(color=COLORS['down'], width=1.5), name='-DI'))
+        fig2.add_hline(y=25, line_dash="dash", line_color=COLORS['text_3'], annotation_text="Trending threshold")
+        fig2.update_layout(height=320, margin=dict(t=20, b=20), yaxis=dict(title="Value"))
+        st.plotly_chart(style_fig(fig2), use_container_width=True)
+        st.caption(
+            "ADX above ~25 signals a genuine trend (up or down); below ~20 suggests a range-bound market where "
+            "trend-following signals (MACD, moving-average crosses) are less reliable. +DI above -DI favors an uptrend "
+            "and vice versa."
+        )
+
+    # ── On-Balance Volume, on its own axis for readability ──
+    with st.expander("📊 On-Balance Volume (OBV)", expanded=False):
+        fig3 = go.Figure()
+        fig3.add_trace(go.Scatter(
+            x=obv.index[idx], y=obv.iloc[idx], line=dict(color=COLORS['accent_3'], width=2),
+            fill='tozeroy', fillcolor='rgba(79,209,255,0.08)', name='OBV',
+        ))
+        fig3.update_layout(height=280, margin=dict(t=20, b=20), yaxis=dict(title="Cumulative OBV"))
+        st.plotly_chart(style_fig(fig3), use_container_width=True)
+        st.caption(
+            "OBV adds volume on up days and subtracts it on down days. Rising OBV alongside rising price confirms the "
+            "move is backed by real participation; a price move without OBV confirmation is a weaker signal."
+        )
