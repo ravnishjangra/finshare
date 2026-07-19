@@ -343,11 +343,9 @@ def main():
                         st.error("Could not fetch data. Try again.")
 
     with tab4:
-        st.caption("💡 Use ticker symbols: AAPL, RELIANCE.NS, TCS.NS, ITC.BO")
         create_portfolio_optimization_tab()
 
     with tab5:
-        st.caption("💡 Use ticker symbols: AAPL, RELIANCE.NS, TCS.NS, ITC.BO")
         create_advanced_portfolio_tab()
 
     st.divider()
