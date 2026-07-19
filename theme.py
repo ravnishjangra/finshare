@@ -62,8 +62,8 @@ def sentiment_color(label: str) -> tuple:
 PLOTLY_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Inter, sans-serif", color=COLORS["text_2"], size=12),
-    title_font=dict(family="Inter, sans-serif", color=COLORS["text_1"], size=15),
+    font=dict(family="Arial, sans-serif", color=COLORS["text_2"], size=12),
+    title_font=dict(family="Arial, sans-serif", color=COLORS["text_1"], size=15),
     legend=dict(
         bgcolor="rgba(0,0,0,0)",
         font=dict(color=COLORS["text_2"], size=11),
@@ -85,7 +85,7 @@ PLOTLY_LAYOUT = dict(
     hoverlabel=dict(
         bgcolor=COLORS["surface"],
         bordercolor=COLORS["border_strong"],
-        font=dict(family="Inter, sans-serif", color=COLORS["text_1"], size=12),
+        font=dict(family="Arial, sans-serif", color=COLORS["text_1"], size=12),
     ),
     colorway=SERIES_PALETTE,
     transition=dict(duration=350, easing="cubic-in-out"),
@@ -204,8 +204,8 @@ def gauge_chart(value: float, title: str = "Sentiment", lo: float = -1.0, hi: fl
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=value,
-        number={"font": {"color": color, "size": 34, "family": "Inter, sans-serif"}, "valueformat": ".2f"},
-        title={"text": title, "font": {"color": COLORS["text_2"], "size": 13, "family": "Inter, sans-serif"}},
+        number={"font": {"color": color, "size": 34, "family": "Arial, sans-serif"}, "valueformat": ".2f"},
+        title={"text": title, "font": {"color": COLORS["text_2"], "size": 13, "family": "Arial, sans-serif"}},
         gauge={
             "axis": {"range": [lo, hi], "tickcolor": COLORS["text_3"], "tickfont": {"color": COLORS["text_3"], "size": 10}},
             "bar": {"color": color, "thickness": 0.28},
