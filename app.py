@@ -346,7 +346,7 @@ def main():
         create_advanced_portfolio_tab()
 
     st.divider()
-    st.markdown(f'<div class="app-footer">Finshare Pro &nbsp;•&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")} &nbsp;•&nbsp; 📧 <a href="mailto:raavnishjangra10@gmail.com" style="color:#6b7488;">Contact</a></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="app-footer">Finshare Pro &nbsp;•&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")} &nbsp;•&nbsp; 📧 <a href="mailto:raavnishjangra10@gmail.com" style="color:#6b7488;">raavnishjangra10@gmail.com</a> &nbsp;•&nbsp; 🔗 <a href="https://linkedin.com/in/ravnish" target="_blank" style="color:#6b7488;">LinkedIn</a></div>', unsafe_allow_html=True)
     
 if __name__ == "__main__":
     main()
