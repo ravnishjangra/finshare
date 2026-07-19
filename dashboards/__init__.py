@@ -7,3 +7,5 @@ from .factor import create_factor_investing_dashboard
 from .index_compare import create_index_comparison_dashboard
 from .portfolio_opt import create_portfolio_optimization_tab
 from .advanced_portfolio import create_advanced_portfolio_tab
+from .news import create_news_dashboard
+ 
