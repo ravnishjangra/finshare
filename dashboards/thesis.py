@@ -130,7 +130,20 @@ def create_investment_thesis_dashboard(analyzer):
                 rg = (analyzer.ratios or {}).get('Revenue Growth (YoY)', 10) or 10
                 rf = 0.072 if (getattr(analyzer, 'currency', 'USD') == 'INR') else 0.045
                 mr = 0.12 if (getattr(analyzer, 'currency', 'USD') == 'INR') else 0.10
-                dcf = AdvancedDCF(fcf, shares, cp, max(0.02, min(rg/100, 0.35)), beta, rf, mr)
+                # Same balance sheet / market cap / tax rate inputs as the
+                # Valuation tab, so this tab's "DCF upside" bullet doesn't
+                # quietly disagree with the main DCF the user already saw.
+                balance = analyzer.financials.get('balance') if hasattr(analyzer, 'financials') else None
+                mcap_for_dcf = (analyzer.live_price_data or {}).get('market_cap')
+                pretax = analyzer._safe_get(income, ['Pretax Income'])
+                tax_paid = analyzer._safe_get(income, ['Tax Provision'])
+                if pretax and tax_paid and pretax > 0:
+                    eff_tax_rate = min(max(tax_paid / pretax, 0.0), 0.45)
+                else:
+                    eff_tax_rate = 0.25 if getattr(analyzer, 'currency', 'USD') == 'INR' else 0.21
+                dcf = AdvancedDCF(fcf, shares, cp, max(0.02, min(rg/100, 0.35)), beta, rf, mr,
+                                   tax_rate=eff_tax_rate, market_cap=mcap_for_dcf,
+                                   balance_df=balance, income_df=income)
                 dcf_result = dcf.calculate()
         except:
             pass

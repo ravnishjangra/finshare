@@ -4,12 +4,21 @@ import pandas as pd
 class AltmanZScore:
     
     # Multiple possible key names for each field
+    # NOTE: 'retained_earnings' and 'total_equity' used to be merged into one
+    # list. That silently substituted TOTAL EQUITY for RETAINED EARNINGS
+    # whenever the latter wasn't reported (common for many data feeds) - and
+    # that same blended value was then reused to *back into* Total Assets via
+    # TA = TL + "RE" in the fallback below. If the value picked up was truly
+    # retained earnings (a subset of equity, missing paid-in capital etc.),
+    # that fallback understated Total Assets, which inflates every ratio that
+    # divides by TA (X1, X2, X3, X5). They're now kept as separate keys.
     KEY_MAP = {
         'current_assets': ['Current Assets', 'Current Assets, Total', 'Total Current Assets'],
         'current_liabilities': ['Current Liabilities', 'Current Liabilities, Total', 'Total Current Liabilities'],
         'total_assets': ['Total Assets', 'Total Assets, Total'],
-        'retained_earnings': ['Retained Earnings', 'Stockholders Equity', 'Total Stockholder Equity', 
-                              'Total Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest'],
+        'retained_earnings': ['Retained Earnings'],
+        'total_equity': ['Stockholders Equity', 'Total Stockholder Equity',
+                          'Total Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest'],
         'ebit': ['EBIT', 'Operating Income', 'Operating Income, Total'],
         'total_liabilities': ['Total Liabilities', 'Total Liabilities Net Minority Interest', 
                               'Total Liabilities, Total'],
@@ -45,20 +54,29 @@ class AltmanZScore:
             cl = AltmanZScore._safe_get(balance_df, AltmanZScore.KEY_MAP['current_liabilities'], bal_col)
             ta = AltmanZScore._safe_get(balance_df, AltmanZScore.KEY_MAP['total_assets'], bal_col)
             re_val = AltmanZScore._safe_get(balance_df, AltmanZScore.KEY_MAP['retained_earnings'], bal_col)
+            total_equity = AltmanZScore._safe_get(balance_df, AltmanZScore.KEY_MAP['total_equity'], bal_col)
             tl = AltmanZScore._safe_get(balance_df, AltmanZScore.KEY_MAP['total_liabilities'], bal_col)
             ebit = AltmanZScore._safe_get(income_df, AltmanZScore.KEY_MAP['ebit'], inc_col)
             sales = AltmanZScore._safe_get(income_df, AltmanZScore.KEY_MAP['revenue'], inc_col)
             
-            # Fallback: if Total Assets not found, try to calculate from Total Liabilities + Equity
-            if ta <= 0 and tl > 0 and re_val > 0:
-                ta = tl + re_val
+            # Fallback: if Total Assets not found, back into it via the
+            # accounting identity TA = TL + Total Equity (NOT retained
+            # earnings, which is only a slice of equity).
+            if ta <= 0 and tl > 0 and total_equity > 0:
+                ta = tl + total_equity
             
             if ta <= 0:
                 return None
             
+            # X2 needs actual retained earnings. If a feed doesn't report it
+            # separately, using total equity in its place materially overstates
+            # X2 (equity is always >= retained earnings), so we degrade
+            # gracefully to 0 rather than silently substituting the wrong figure.
+            x2_re = re_val if re_val else 0
+            
             wc = ca - cl
             x1 = wc / ta
-            x2 = re_val / ta
+            x2 = x2_re / ta
             x3 = ebit / ta
             x4 = (market_cap or 0) / tl if tl and tl > 0 else 0
             x5 = sales / ta

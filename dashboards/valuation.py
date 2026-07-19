@@ -1,11 +1,12 @@
 """Valuation Dashboard"""
 import streamlit as st
+import numpy as np
 import plotly.graph_objects as go
 from models.dcf import AdvancedDCF
 from models.graham import GrahamValuation
 from models.epv import EarningsPowerValue
 from models.residual_income import ResidualIncome
-from theme import COLORS, style_fig
+from theme import COLORS, style_fig, style_fig_3d, VALUE_COLORSCALE, animated_config
 
 def create_valuation_dashboard(analyzer):
     st.markdown('<div class="section-header">💰 Advanced Valuation Models</div>', unsafe_allow_html=True)
@@ -64,9 +65,6 @@ def create_valuation_dashboard(analyzer):
 
     balance = analyzer.financials.get('balance')
     mcap = analyzer.live_price_data.get('market_cap')
-    # Effective tax rate from the P&L when available (Tax Provision / Pretax
-    # Income), else a sane country-level default instead of a hardcoded 25%
-    # for every market.
     pretax = analyzer._safe_get(income, ['Pretax Income']) if income is not None else None
     tax_paid = analyzer._safe_get(income, ['Tax Provision']) if income is not None else None
     if pretax and tax_paid and pretax > 0:
@@ -102,9 +100,6 @@ def create_valuation_dashboard(analyzer):
     st.plotly_chart(style_fig(fig), use_container_width=True)
 
     eps = analyzer.ratios.get('EPS', ni/shares if ni and shares else 1)
-    # Graham's formula calls for a corporate (AAA) bond yield, not the pure
-    # risk-free rate - the risk-free rate understates Y and inflates the
-    # result. Approximate with a modest credit spread over Rf.
     corp_bond_yield = rf + 0.01
     graham_val = GrahamValuation.calculate(eps, rg, corp_bond_yield) if eps and eps > 0 else 0
     epv = EarningsPowerValue.calculate(rev or 0, om, eff_tax_rate, result['wacc'], shares,
@@ -120,6 +115,48 @@ def create_valuation_dashboard(analyzer):
     fig.add_hline(y=cp, line_dash="dash", line_color=COLORS['text_3'])
     fig.update_layout(title='All Valuation Models', height=400, showlegend=False)
     st.plotly_chart(style_fig(fig), use_container_width=True)
+
+    # ===== 3D DCF SENSITIVITY SURFACE =====
+    st.markdown('<div class="section-header">🧊 3D Valuation Sensitivity</div>', unsafe_allow_html=True)
+    st.caption("Intrinsic value across a grid of Growth × WACC assumptions — drag to rotate, scroll to zoom")
+
+    growth_lo, growth_hi = max(0.01, dcf_growth - 0.15), min(0.40, dcf_growth + 0.15)
+    beta_lo, beta_hi = max(0.3, dcf_beta - 0.9), min(2.6, dcf_beta + 0.9)
+    growth_grid = np.linspace(growth_lo, growth_hi, 16)
+    beta_grid = np.linspace(beta_lo, beta_hi, 16)
+
+    z_surface = np.zeros((len(beta_grid), len(growth_grid)))
+    wacc_axis = np.zeros(len(beta_grid))
+    for i, b in enumerate(beta_grid):
+        trial = None
+        for j, g in enumerate(growth_grid):
+            trial = AdvancedDCF(dcf_fcf, dcf_shares, cp, g, b, dcf_rf, dcf_mr,
+                                tax_rate=eff_tax_rate, market_cap=mcap,
+                                balance_df=balance, income_df=income)
+            z_surface[i, j] = trial.calculate()['intrinsic_value']
+        wacc_axis[i] = trial.wacc * 100
+
+    z_cap = np.nanpercentile(z_surface, 97)
+    z_surface_display = np.clip(z_surface, None, z_cap)
+
+    fig3d = go.Figure(data=[go.Surface(
+        x=growth_grid * 100, y=wacc_axis, z=z_surface_display,
+        colorscale=VALUE_COLORSCALE,
+        colorbar=dict(title=f"{cur}/sh", tickfont=dict(color=COLORS['text_3']), len=0.65),
+        contours={"z": {"show": True, "usecolormap": True, "highlightcolor": COLORS['accent_3'], "project_z": True}},
+        hovertemplate="Growth: %{x:.1f}%<br>WACC: %{y:.1f}%<br>Value: " + cur + "%{z:.2f}<extra></extra>",
+        opacity=0.94,
+    )])
+    fig3d.add_trace(go.Scatter3d(
+        x=[dcf_growth * 100], y=[result['wacc'] * 100], z=[min(result['intrinsic_value'], z_cap)],
+        mode='markers+text', text=['Current'], textposition='top center',
+        marker=dict(size=6, color=COLORS['text_1'], symbol='diamond', line=dict(width=1.5, color=COLORS['accent_3'])),
+        textfont=dict(color=COLORS['text_1'], size=11), showlegend=False,
+        hovertemplate="Current assumptions<br>Value: " + cur + "%{z:.2f}<extra></extra>",
+    ))
+    fig3d = style_fig_3d(fig3d, x_title="Growth %", y_title="WACC %", z_title=f"Intrinsic Value ({cur})", height=520)
+    st.plotly_chart(fig3d, use_container_width=True, config=animated_config())
+    st.caption("Green ridge = assumption combinations that make the stock look cheap; red = expensive.")
 
     # ===== RESIDUAL INCOME VALUATION =====
     st.markdown("### 📊 Residual Income Valuation")

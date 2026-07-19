@@ -84,7 +84,7 @@ class CompositeScore:
             elif z > 1.81: score += 5
             else: score += 2
         max_score += 10
-        breakdown['Altman'] = round(altman_score.get('z_score', 0) / 3 * 100) if altman_score else 0
+        breakdown['Altman'] = min(100, round(altman_score.get('z_score', 0) / 3 * 100)) if altman_score else 0
         
         final_score = round(score / max_score * 100) if max_score > 0 else 0
         

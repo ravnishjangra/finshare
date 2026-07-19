@@ -88,10 +88,12 @@ def create_financial_models_dashboard(analyzer):
             ("Jensen's Alpha", f"{perf['jensens_alpha']}%"),
             ('Beta', f"{perf['beta']}"),
             ('Treynor Ratio', f"{perf['treynor_ratio']}"),
-            ('Info Ratio', f"{perf['information_ratio']}"),
+            ('Info Ratio*' if perf.get('information_ratio_is_approx') else 'Info Ratio', f"{perf['information_ratio']}"),
             ('Calmar Ratio', f"{perf['calmar_ratio']}"),
         ]):
             with col: st.metric(label, val)
+        if perf.get('information_ratio_is_approx'):
+            st.caption("*Approximate - no benchmark index series available, so this uses the stock's own volatility instead of true tracking error vs. a benchmark.")
         
         with st.expander("🔍 Risk Metrics (VaR & CVaR)"):
             c1, c2, c3, c4 = st.columns(4)
