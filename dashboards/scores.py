@@ -32,8 +32,8 @@ def create_advanced_scores_dashboard(analyzer):
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=score,
-            number={'font': {'color': score_color, 'size': 48}},
-            title={'text': "Piotroski F-Score", 'font': {'size': 14, 'color': COLORS['text_2']}},
+            number={'font': {'color': score_color, 'size': 48, 'family': 'Inter, sans-serif'}},
+            title={'text': "Piotroski F-Score", 'font': {'size': 14, 'color': COLORS['text_2'], 'family': 'Inter, sans-serif'}},
             gauge={
                 'axis': {'range': [0, 9], 'tickwidth': 1, 'tickcolor': COLORS['text_3']},
                 'bar': {'color': score_color, 'thickness': 0.2},
@@ -46,7 +46,7 @@ def create_advanced_scores_dashboard(analyzer):
                 'threshold': {'line': {'color': score_color, 'width': 3}, 'thickness': 0.8, 'value': score}
             }
         ))
-        fig.update_layout(height=220, margin=dict(t=30, b=0, l=20, r=20))
+        fig.update_layout(height=220, margin=dict(t=40, b=10, l=30, r=30))
         st.plotly_chart(style_fig(fig), use_container_width=True)
         
         st.markdown(f"<h3 style='text-align:center; color:{score_color};'>{rating}</h3>", unsafe_allow_html=True)
@@ -56,7 +56,6 @@ def create_advanced_scores_dashboard(analyzer):
             st.markdown("---")
             st.markdown(f"**Overall Score: {breakdown.get('total', 'N/A')}**")
             
-            # ===== ALL 9 FACTORS SCORECARD =====
             with st.expander("📋 Full Scorecard (9 Factors)", expanded=True):
                 for category_name, category_key in [
                     ('💰 Profitability', 'profitability'),
@@ -107,8 +106,8 @@ def create_advanced_scores_dashboard(analyzer):
             fig = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=z,
-                number={'font': {'color': z_color, 'size': 48}},
-                title={'text': "Altman Z-Score", 'font': {'size': 14, 'color': COLORS['text_2']}},
+                number={'font': {'color': z_color, 'size': 48, 'family': 'Inter, sans-serif'}},
+                title={'text': "Altman Z-Score", 'font': {'size': 14, 'color': COLORS['text_2'], 'family': 'Inter, sans-serif'}},
                 gauge={
                     'axis': {'range': [0, 6], 'tickwidth': 1, 'tickcolor': COLORS['text_3']},
                     'bar': {'color': z_color, 'thickness': 0.2},
@@ -121,7 +120,7 @@ def create_advanced_scores_dashboard(analyzer):
                     'threshold': {'line': {'color': z_color, 'width': 3}, 'thickness': 0.8, 'value': z}
                 }
             ))
-            fig.update_layout(height=220, margin=dict(t=30, b=0, l=20, r=20))
+            fig.update_layout(height=220, margin=dict(t=40, b=10, l=30, r=30))
             st.plotly_chart(style_fig(fig), use_container_width=True)
             
             st.markdown(f"<h3 style='text-align:center; color:{z_color};'>{zone}</h3>", unsafe_allow_html=True)

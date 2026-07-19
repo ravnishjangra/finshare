@@ -165,6 +165,7 @@ def main():
                 key="main_ticker_widget",
                 placeholder="Type any ticker (e.g., AAPL, RELIANCE, VEDL)...",
             )
+            st.caption("💡 **Exchange tip:** Use US Market for US stocks (AAPL). Use NSE India (.NS) or BSE India (.BO) for Indian stocks. If .NS doesn't work, try .BO — some stocks are only listed on one exchange.")
         
         with c2:
             exchange = st.selectbox(
