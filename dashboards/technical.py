@@ -1,7 +1,7 @@
 """Technical Analysis Dashboard
 
 Covers trend (SMA/EMA, Bollinger Bands, Golden/Death Cross), momentum
-(RSI, MACD, Stochastic Oscillator), trend strength (ADX/DMI), and — new —
+(RSI, MACD, Stochastic Oscillator), trend strength (ADX/DMI), and
 volume (volume bars + volume MA + On-Balance Volume) and volatility
 (ATR%, rolling annualized historical volatility, Bollinger Band width).
 No external TA library is used (none is in requirements.txt), so every
@@ -66,6 +66,7 @@ def create_technical_dashboard(analyzer):
     low = prices['Low'] if 'Low' in prices.columns else close
     volume = prices['Volume'] if 'Volume' in prices.columns else pd.Series(0, index=close.index)
     cur = analyzer.currency_symbol
+    open_price = prices['Open'] if 'Open' in prices.columns else close
 
     # ── Momentum: RSI ──
     delta = close.diff()
@@ -88,7 +89,6 @@ def create_technical_dashboard(analyzer):
     std20 = close.rolling(20).std()
     upper = sma20 + 2 * std20
     lower = sma20 - 2 * std20
-    bb_width_pct = ((upper - lower) / sma20 * 100)
 
     sma50 = close.rolling(50).mean()
     sma200 = close.rolling(200).mean()
@@ -127,82 +127,104 @@ def create_technical_dashboard(analyzer):
     col8.metric("Hist. Volatility (20D, ann.)", f"{hist_vol_20.iloc[-1]:.1f}%")
     col9.metric("Close", f"{cur}{close.iloc[-1]:.2f}")
 
+    st.markdown("---")
     idx = slice(-180, None)
 
-    fig = make_subplots(
-        rows=6, cols=1, shared_xaxes=True, vertical_spacing=0.025,
-        row_heights=[0.28, 0.13, 0.13, 0.13, 0.13, 0.20],
-        subplot_titles=("Price & Bollinger Bands", "Volume & On-Balance Volume", "RSI (14)",
-                         "Stochastic Oscillator (14,3)", "MACD (12,26,9)", "ATR% & Historical Volatility"),
-    )
+    # ===== CHART 1: Price & Bollinger Bands =====
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(x=close.index[idx], y=upper.iloc[idx],
+        line=dict(color=COLORS['text_3'], width=1, dash='dash'), name='Upper BB'))
+    fig1.add_trace(go.Scatter(x=close.index[idx], y=sma20.iloc[idx],
+        line=dict(color=COLORS['neutral'], width=1.5), name='20 MA'))
+    fig1.add_trace(go.Scatter(x=close.index[idx], y=lower.iloc[idx],
+        line=dict(color=COLORS['text_3'], width=1, dash='dash'),
+        fill='tonexty', fillcolor='rgba(109,94,248,0.06)', name='Lower BB'))
+    fig1.add_trace(go.Scatter(x=close.index[idx], y=sma50.iloc[idx],
+        line=dict(color=COLORS['accent_2'], width=1, dash='dot'), name='50 SMA'))
+    fig1.add_trace(go.Scatter(x=close.index[idx], y=close.iloc[idx],
+        line=dict(color=COLORS['accent_1'], width=2), name='Price'))
+    fig1.update_layout(height=350, title="Price & Bollinger Bands",
+        margin=dict(l=10, r=10, t=35, b=10), hovermode='x unified',
+        legend=dict(orientation='h', y=1.05))
+    st.plotly_chart(style_fig(fig1), use_container_width=True)
 
-    # Row 1: Price + BB
-    fig.add_trace(go.Scatter(x=close.index[idx], y=upper.iloc[idx], line=dict(color=COLORS['text_3'], width=1, dash='dash'), name='Upper BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=sma20.iloc[idx], line=dict(color=COLORS['neutral'], width=1.5), name='20 MA'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=lower.iloc[idx], line=dict(color=COLORS['text_3'], width=1, dash='dash'), fill='tonexty', fillcolor='rgba(109,94,248,0.06)', name='Lower BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=sma50.iloc[idx], line=dict(color=COLORS['accent_2'], width=1, dash='dot'), name='50 SMA'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=close.index[idx], y=close.iloc[idx], line=dict(color=COLORS['accent_1'], width=2), name='Price'), row=1, col=1)
+    # ===== CHART 2: Volume + OBV =====
+    fig2 = make_subplots(specs=[[{"secondary_y": True}]])
+    vol_colors = [COLORS['up'] if c >= o else COLORS['down']
+                  for c, o in zip(close.iloc[idx], open_price.iloc[idx])]
+    fig2.add_trace(go.Bar(x=volume.index[idx], y=volume.iloc[idx],
+        marker_color=vol_colors, name='Volume', opacity=0.7), secondary_y=False)
+    fig2.add_trace(go.Scatter(x=vol_ma20.index[idx], y=vol_ma20.iloc[idx],
+        line=dict(color=COLORS['neutral'], width=1.5), name='Vol 20D Avg'), secondary_y=False)
+    fig2.add_trace(go.Scatter(x=obv.index[idx], y=obv.iloc[idx],
+        line=dict(color=COLORS['accent_3'], width=1.5), name='OBV'), secondary_y=True)
+    fig2.update_layout(height=280, title="Volume & On-Balance Volume",
+        margin=dict(l=10, r=10, t=35, b=10), hovermode='x unified',
+        legend=dict(orientation='h', y=1.05))
+    fig2.update_yaxes(title_text="Volume", secondary_y=False)
+    fig2.update_yaxes(title_text="OBV", secondary_y=True)
+    st.plotly_chart(style_fig(fig2), use_container_width=True)
 
-    # Row 2: Volume + OBV (secondary axis via a twin trace using normalized OBV)
-    vol_colors = [COLORS['up'] if c >= o else COLORS['down'] for c, o in zip(close.iloc[idx], prices['Open'].iloc[idx] if 'Open' in prices.columns else close.iloc[idx])]
-    fig.add_trace(go.Bar(x=volume.index[idx], y=volume.iloc[idx], marker_color=vol_colors, name='Volume', opacity=0.7), row=2, col=1)
-    fig.add_trace(go.Scatter(x=vol_ma20.index[idx], y=vol_ma20.iloc[idx], line=dict(color=COLORS['neutral'], width=1.5), name='Vol 20D Avg'), row=2, col=1)
+    # ===== CHART 3: RSI + Stochastic (combined oscillators) =====
+    fig3 = go.Figure()
+    fig3.add_trace(go.Scatter(x=rsi.index[idx], y=rsi.iloc[idx],
+        line=dict(color=COLORS['accent_3'], width=2), name='RSI'))
+    fig3.add_trace(go.Scatter(x=stoch_k.index[idx], y=stoch_k.iloc[idx],
+        line=dict(color=COLORS['accent_1'], width=1.5, dash='dot'), name='Stoch %K'))
+    fig3.add_hline(y=70, line_dash="dash", line_color=COLORS['down'],
+                   annotation_text="Overbought 70")
+    fig3.add_hline(y=30, line_dash="dash", line_color=COLORS['up'],
+                   annotation_text="Oversold 30")
+    fig3.update_layout(height=280, title="RSI (14) & Stochastic (14,3)",
+        margin=dict(l=10, r=10, t=35, b=10), hovermode='x unified',
+        legend=dict(orientation='h', y=1.05),
+        yaxis=dict(range=[0, 100], title="Value"))
+    st.plotly_chart(style_fig(fig3), use_container_width=True)
 
-    # Row 3: RSI
-    fig.add_trace(go.Scatter(x=rsi.index[idx], y=rsi.iloc[idx], line=dict(color=COLORS['accent_3'], width=2), name='RSI'), row=3, col=1)
-    fig.add_hline(y=70, line_dash="dash", line_color=COLORS['down'], row=3, col=1)
-    fig.add_hline(y=30, line_dash="dash", line_color=COLORS['up'], row=3, col=1)
-
-    # Row 4: Stochastic
-    fig.add_trace(go.Scatter(x=stoch_k.index[idx], y=stoch_k.iloc[idx], line=dict(color=COLORS['accent_1'], width=1.8), name='%K'), row=4, col=1)
-    fig.add_trace(go.Scatter(x=stoch_d.index[idx], y=stoch_d.iloc[idx], line=dict(color=COLORS['neutral'], width=1.5, dash='dot'), name='%D'), row=4, col=1)
-    fig.add_hline(y=80, line_dash="dash", line_color=COLORS['down'], row=4, col=1)
-    fig.add_hline(y=20, line_dash="dash", line_color=COLORS['up'], row=4, col=1)
-
-    # Row 5: MACD
-    fig.add_trace(go.Scatter(x=macd.index[idx], y=macd.iloc[idx], line=dict(color=COLORS['accent_1'], width=2), name='MACD'), row=5, col=1)
-    fig.add_trace(go.Scatter(x=signal.index[idx], y=signal.iloc[idx], line=dict(color=COLORS['neutral'], width=1.5), name='Signal'), row=5, col=1)
+    # ===== CHART 4: MACD =====
+    fig4 = go.Figure()
+    fig4.add_trace(go.Scatter(x=macd.index[idx], y=macd.iloc[idx],
+        line=dict(color=COLORS['accent_1'], width=2), name='MACD'))
+    fig4.add_trace(go.Scatter(x=signal.index[idx], y=signal.iloc[idx],
+        line=dict(color=COLORS['neutral'], width=1.5), name='Signal'))
     macd_colors = [COLORS['up'] if h >= 0 else COLORS['down'] for h in hist.iloc[idx]]
-    fig.add_trace(go.Bar(x=hist.index[idx], y=hist.iloc[idx], marker_color=macd_colors, name='Histogram'), row=5, col=1)
+    fig4.add_trace(go.Bar(x=hist.index[idx], y=hist.iloc[idx],
+        marker_color=macd_colors, name='Histogram'))
+    fig4.update_layout(height=280, title="MACD (12,26,9)",
+        margin=dict(l=10, r=10, t=35, b=10), hovermode='x unified',
+        legend=dict(orientation='h', y=1.05),
+        yaxis=dict(title="Value"))
+    st.plotly_chart(style_fig(fig4), use_container_width=True)
 
-    # Row 6: ATR% + Historical Volatility
-    fig.add_trace(go.Scatter(x=atr_pct.index[idx], y=atr_pct.iloc[idx], line=dict(color=COLORS['accent_3'], width=1.8), name='ATR %', fill='tozeroy', fillcolor='rgba(79,209,255,0.08)'), row=6, col=1)
-    fig.add_trace(go.Scatter(x=hist_vol_20.index[idx], y=hist_vol_20.iloc[idx], line=dict(color=COLORS['accent_2'], width=1.8, dash='dot'), name='Hist. Vol (ann.) %'), row=6, col=1)
+    # ===== CHART 5: ATR% + Historical Volatility =====
+    fig5 = go.Figure()
+    fig5.add_trace(go.Scatter(x=atr_pct.index[idx], y=atr_pct.iloc[idx],
+        line=dict(color=COLORS['accent_3'], width=1.8), name='ATR %',
+        fill='tozeroy', fillcolor='rgba(79,209,255,0.08)'))
+    fig5.add_trace(go.Scatter(x=hist_vol_20.index[idx], y=hist_vol_20.iloc[idx],
+        line=dict(color=COLORS['accent_2'], width=1.8, dash='dot'), name='Hist Vol %'))
+    fig5.update_layout(height=280, title="ATR% & Historical Volatility (20D, ann.)",
+        margin=dict(l=10, r=10, t=35, b=10), hovermode='x unified',
+        legend=dict(orientation='h', y=1.05),
+        yaxis=dict(title="%"))
+    st.plotly_chart(style_fig(fig5), use_container_width=True)
 
-    fig.update_layout(height=1150, hovermode='x unified', legend=dict(orientation='h', y=1.02))
-    fig.update_yaxes(title_text="Price", row=1, col=1)
-    fig.update_yaxes(title_text="Shares", row=2, col=1)
-    fig.update_yaxes(title_text="RSI", range=[0, 100], row=3, col=1)
-    fig.update_yaxes(title_text="Stoch", range=[0, 100], row=4, col=1)
-    fig.update_yaxes(title_text="MACD", row=5, col=1)
-    fig.update_yaxes(title_text="%", row=6, col=1)
-    st.plotly_chart(style_fig(fig), use_container_width=True)
-
-    # ── ADX / DMI trend-strength panel (separate, since it's a distinct read from momentum) ──
+    # ── ADX / DMI trend-strength panel ──
     with st.expander("📐 ADX / Directional Movement Index (Trend Strength)", expanded=False):
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=adx.index[idx], y=adx.iloc[idx], line=dict(color=COLORS['accent_1'], width=2.2), name='ADX'))
-        fig2.add_trace(go.Scatter(x=plus_di.index[idx], y=plus_di.iloc[idx], line=dict(color=COLORS['up'], width=1.5), name='+DI'))
-        fig2.add_trace(go.Scatter(x=minus_di.index[idx], y=minus_di.iloc[idx], line=dict(color=COLORS['down'], width=1.5), name='-DI'))
-        fig2.add_hline(y=25, line_dash="dash", line_color=COLORS['text_3'], annotation_text="Trending threshold")
-        fig2.update_layout(height=320, margin=dict(t=20, b=20), yaxis=dict(title="Value"))
-        st.plotly_chart(style_fig(fig2), use_container_width=True)
+        fig_adx = go.Figure()
+        fig_adx.add_trace(go.Scatter(x=adx.index[idx], y=adx.iloc[idx],
+            line=dict(color=COLORS['accent_1'], width=2.2), name='ADX'))
+        fig_adx.add_trace(go.Scatter(x=plus_di.index[idx], y=plus_di.iloc[idx],
+            line=dict(color=COLORS['up'], width=1.5), name='+DI'))
+        fig_adx.add_trace(go.Scatter(x=minus_di.index[idx], y=minus_di.iloc[idx],
+            line=dict(color=COLORS['down'], width=1.5), name='-DI'))
+        fig_adx.add_hline(y=25, line_dash="dash", line_color=COLORS['text_3'],
+                          annotation_text="Trending threshold")
+        fig_adx.update_layout(height=320, margin=dict(t=20, b=20),
+                              yaxis=dict(title="Value"))
+        st.plotly_chart(style_fig(fig_adx), use_container_width=True)
         st.caption(
             "ADX above ~25 signals a genuine trend (up or down); below ~20 suggests a range-bound market where "
             "trend-following signals (MACD, moving-average crosses) are less reliable. +DI above -DI favors an uptrend "
             "and vice versa."
-        )
-
-    # ── On-Balance Volume, on its own axis for readability ──
-    with st.expander("📊 On-Balance Volume (OBV)", expanded=False):
-        fig3 = go.Figure()
-        fig3.add_trace(go.Scatter(
-            x=obv.index[idx], y=obv.iloc[idx], line=dict(color=COLORS['accent_3'], width=2),
-            fill='tozeroy', fillcolor='rgba(79,209,255,0.08)', name='OBV',
-        ))
-        fig3.update_layout(height=280, margin=dict(t=20, b=20), yaxis=dict(title="Cumulative OBV"))
-        st.plotly_chart(style_fig(fig3), use_container_width=True)
-        st.caption(
-            "OBV adds volume on up days and subtracts it on down days. Rising OBV alongside rising price confirms the "
-            "move is backed by real participation; a price move without OBV confirmation is a weaker signal."
         )
