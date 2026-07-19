@@ -20,9 +20,9 @@ COLORS = {
     "border": "rgba(148, 163, 253, 0.10)",
     "border_strong": "rgba(148, 163, 253, 0.22)",
 
-    "accent_1": "#6d5ef8",
-    "accent_2": "#9b6bf5",
-    "accent_3": "#4fd1ff",
+    "accent_1": "#6d5ef8",   # indigo
+    "accent_2": "#9b6bf5",   # violet
+    "accent_3": "#4fd1ff",   # cyan
 
     "up": "#22d38f",
     "up_soft": "rgba(34, 211, 143, 0.15)",
@@ -59,8 +59,8 @@ def sentiment_color(label: str) -> tuple:
 PLOTLY_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Arial, sans-serif", color=COLORS["text_2"], size=12),
-    title_font=dict(family="Arial, sans-serif", color=COLORS["text_1"], size=15),
+    font=dict(family="Inter, sans-serif", color=COLORS["text_2"], size=12),
+    title_font=dict(family="Inter, sans-serif", color=COLORS["text_1"], size=15),
     legend=dict(
         bgcolor="rgba(0,0,0,0)",
         font=dict(color=COLORS["text_2"], size=11),
@@ -82,7 +82,7 @@ PLOTLY_LAYOUT = dict(
     hoverlabel=dict(
         bgcolor=COLORS["surface"],
         bordercolor=COLORS["border_strong"],
-        font=dict(family="Arial, sans-serif", color=COLORS["text_1"], size=12),
+        font=dict(family="Inter, sans-serif", color=COLORS["text_1"], size=12),
     ),
     colorway=SERIES_PALETTE,
     bargap=0.28,
@@ -104,7 +104,6 @@ def animated_config():
     }
 
 
-# ── HTML snippet helpers ────────────────────────────────────────────────
 def metric_card(label: str, value: str, delta: str = None, positive: bool = True) -> str:
     delta_html = ""
     if delta:
@@ -180,6 +179,57 @@ def news_card(title: str, source: str, time_ago: str, link: str, label: str = "N
     )
 
 
+VALUE_COLORSCALE = [
+    [0.0, COLORS["down"]],
+    [0.5, COLORS["neutral"]],
+    [1.0, COLORS["up"]],
+]
+
+BRAND_COLORSCALE = [
+    [0.0, COLORS["accent_1"]],
+    [0.5, COLORS["accent_2"]],
+    [1.0, COLORS["accent_3"]],
+]
+
+
+def scene3d(x_title="", y_title="", z_title="", eye=(1.6, 1.5, 1.15)):
+    axis = dict(
+        title=dict(font=dict(color=COLORS["text_3"], size=11)),
+        backgroundcolor=COLORS["bg_1"],
+        gridcolor=COLORS["border"],
+        zerolinecolor=COLORS["border_strong"],
+        showbackground=True,
+        color=COLORS["text_3"],
+        tickfont=dict(color=COLORS["text_3"], size=9),
+    )
+    return dict(
+        xaxis={**axis, "title": {**axis["title"], "text": x_title}},
+        yaxis={**axis, "title": {**axis["title"], "text": y_title}},
+        zaxis={**axis, "title": {**axis["title"], "text": z_title}},
+        camera=dict(eye=dict(x=eye[0], y=eye[1], z=eye[2]), up=dict(x=0, y=0, z=1)),
+        aspectmode="cube",
+        bgcolor="rgba(0,0,0,0)",
+    )
+
+
+def style_fig_3d(fig, x_title="", y_title="", z_title="", eye=(1.6, 1.5, 1.15), height=520):
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, sans-serif", color=COLORS["text_2"], size=12),
+        title_font=dict(family="Inter, sans-serif", color=COLORS["text_1"], size=15),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=COLORS["text_2"], size=11)),
+        hoverlabel=dict(
+            bgcolor=COLORS["surface"],
+            bordercolor=COLORS["border_strong"],
+            font=dict(family="Inter, sans-serif", color=COLORS["text_1"], size=12),
+        ),
+        scene=scene3d(x_title, y_title, z_title, eye=eye),
+        height=height,
+        margin=dict(l=0, r=0, t=40, b=0),
+    )
+    return fig
+
+
 def gauge_chart(value: float, title: str = "Sentiment", lo: float = -1.0, hi: float = 1.0):
     import plotly.graph_objects as go
 
@@ -187,8 +237,8 @@ def gauge_chart(value: float, title: str = "Sentiment", lo: float = -1.0, hi: fl
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=value,
-        number={"font": {"color": color, "size": 34, "family": "Arial, sans-serif"}, "valueformat": ".2f"},
-        title={"text": title, "font": {"color": COLORS["text_2"], "size": 13, "family": "Arial, sans-serif"}},
+        number={"font": {"color": color, "size": 34, "family": "Inter, sans-serif"}, "valueformat": ".2f"},
+        title={"text": title, "font": {"color": COLORS["text_2"], "size": 13, "family": "Inter, sans-serif"}},
         gauge={
             "axis": {"range": [lo, hi], "tickcolor": COLORS["text_3"], "tickfont": {"color": COLORS["text_3"], "size": 10}},
             "bar": {"color": color, "thickness": 0.28},

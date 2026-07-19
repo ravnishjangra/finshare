@@ -7,12 +7,11 @@ import yfinance as yf
 from scipy.optimize import minimize
 from analytics.portfolio import PortfolioOptimizer
 from models.max_diversification import MaxDiversification
-from theme import COLORS, style_fig
+from theme import COLORS, style_fig, style_fig_3d, animated_config
 
 def create_portfolio_optimization_tab():
     st.markdown('<div class="section-header">🎯 Portfolio Strategy Comparison</div>', unsafe_allow_html=True)
     st.caption("Compare 6 portfolio construction strategies side-by-side")
-    st.caption("💡 Enter ticker symbols, not full names. Use .NS for NSE (TCS.NS, RELIANCE.NS), .BO for BSE, no suffix for US (AAPL, MSFT)")
     
     presets = {
         "🔧 Custom": [],
@@ -151,7 +150,50 @@ def create_portfolio_optimization_tab():
         fig.update_layout(xaxis_title='Risk (Volatility %)', yaxis_title='Return (%)',
                           height=400, showlegend=False)
         st.plotly_chart(style_fig(fig), use_container_width=True)
-        
+
+        # ===== 3D EFFICIENT FRONTIER (MONTE CARLO CLOUD) =====
+        st.markdown('<div class="section-header">🧊 3D Efficient Frontier</div>', unsafe_allow_html=True)
+        st.caption("3,000 randomly-weighted portfolios from your asset universe — Risk × Return × Sharpe. Drag to rotate.")
+
+        n_portfolios = 3000
+        rng = np.random.default_rng(42)
+        raw_w = rng.dirichlet(np.ones(n) * 0.8, size=n_portfolios)  # dirichlet keeps weights summing to 1
+        cloud_returns = raw_w @ mean_ret
+        cloud_vols = np.sqrt(np.einsum('ij,jk,ik->i', raw_w, cov, raw_w))
+        cloud_vols = np.where(cloud_vols <= 0, 1e-9, cloud_vols)
+        cloud_sharpe = (cloud_returns - risk_free) / cloud_vols
+
+        fig3d = go.Figure()
+        fig3d.add_trace(go.Scatter3d(
+            x=cloud_vols * 100, y=cloud_returns * 100, z=cloud_sharpe,
+            mode='markers',
+            marker=dict(
+                size=2.6, color=cloud_sharpe, colorscale=[
+                    [0.0, COLORS['down']], [0.5, COLORS['neutral']], [1.0, COLORS['up']],
+                ],
+                opacity=0.55, colorbar=dict(title="Sharpe", tickfont=dict(color=COLORS['text_3']), len=0.65),
+            ),
+            hovertemplate="Risk: %{x:.1f}%<br>Return: %{y:.1f}%<br>Sharpe: %{z:.2f}<extra></extra>",
+            name="Random portfolios",
+        ))
+        fig3d.add_trace(go.Scatter3d(
+            x=[s['volatility']*100 for s in strategies],
+            y=[s['return']*100 for s in strategies],
+            z=[s['sharpe'] for s in strategies],
+            mode='markers+text',
+            text=[s['name'] for s in strategies],
+            textposition='top center',
+            textfont=dict(color=COLORS['text_1'], size=10),
+            marker=dict(size=7, color=[s['color'] for s in strategies], symbol='diamond',
+                        line=dict(width=1.5, color=COLORS['text_1'])),
+            hovertemplate="%{text}<br>Risk: %{x:.1f}%<br>Return: %{y:.1f}%<br>Sharpe: %{z:.2f}<extra></extra>",
+            name="Named strategies",
+        ))
+        fig3d = style_fig_3d(fig3d, x_title="Risk (Vol %)", y_title="Return (%)", z_title="Sharpe Ratio", height=560)
+        fig3d.update_layout(showlegend=False)
+        st.plotly_chart(fig3d, use_container_width=True, config=animated_config())
+        st.caption("Diamonds are the 6 named strategies from above; the cloud shows what's achievable with other weight combinations.")
+
         # ===== HEATMAP =====
         st.markdown("### 🔥 Weight Allocation Heatmap")
         hm_data = {}

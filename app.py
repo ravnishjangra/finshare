@@ -16,12 +16,21 @@ from dashboards.index_compare import create_index_comparison_dashboard
 from dashboards.portfolio_opt import create_portfolio_optimization_tab
 from dashboards.advanced_portfolio import create_advanced_portfolio_tab
 from dashboards.news import create_news_dashboard
+from dashboards.peer3d import create_peer_3d_scatter
+from components.hero3d import get_hero_html
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Finshare Pro", page_icon="📊", layout="wide")
 
+# ===== FONT LOADING (link method - more reliable than @import) =====
+st.markdown("""
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
     :root {
         --bg-0: #05070d; --bg-1: #0a0e17; --bg-2: #10141f;
         --surface: #131826; --surface-hover: #171d2e;
@@ -34,7 +43,7 @@ st.markdown("""
         --text-1: #f4f6fb; --text-2: #aab1c5; --text-3: #6b7488;
         --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px;
         --shadow-lift: 0 18px 40px rgba(3, 5, 12, 0.55);
-        --font-display: 'Inter', sans-serif;
+        --font-display: 'Manrope', 'Inter', sans-serif;
         --font-body: 'Inter', sans-serif;
         --font-mono: 'JetBrains Mono', monospace;
     }
@@ -77,15 +86,12 @@ st.markdown("""
     .streamlit-expanderHeader { background: var(--surface); border-radius: var(--radius-sm) !important; font-weight: 700; font-size: 0.9rem; color: var(--text-1) !important; border: 1px solid var(--border) !important; }
     .streamlit-expanderHeader:hover { border-color: var(--border-strong) !important; }
     [data-testid="stDataFrame"] { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
-
-    /* News feed cards */
     .news-card { background: linear-gradient(160deg, var(--surface) 0%, var(--bg-2) 100%); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.9rem 1.1rem; margin-bottom: 0.6rem; transition: all 0.22s cubic-bezier(0.4,0,0.2,1); }
     .news-card:hover { transform: translateX(3px); border-color: var(--border-strong); box-shadow: var(--shadow-lift); background: linear-gradient(160deg, var(--surface-hover) 0%, var(--bg-2) 100%); }
     .news-card-title { font-family: var(--font-display); color: var(--text-1); font-size: 0.98rem; font-weight: 700; line-height: 1.4; margin-bottom: 0.5rem; letter-spacing: -0.1px; }
     .news-card-meta { display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem; color: var(--text-3); font-weight: 600; }
     .news-card-source { color: var(--accent-3); }
     .news-card-dot { color: var(--text-3); }
-
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-in { animation: fadeInUp 0.45s cubic-bezier(0.4, 0, 0.2, 1) backwards; }
     .animate-in:nth-child(1) { animation-delay: 0.02s; } .animate-in:nth-child(2) { animation-delay: 0.06s; }
