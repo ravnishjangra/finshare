@@ -14,7 +14,11 @@ import time
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
 
-import feedparser
+try:
+    import feedparser
+except ImportError:
+    feedparser = None
+
 import yfinance as yf
 
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
@@ -41,6 +45,8 @@ def _to_iso(struct_time):
 
 def fetch_google_news(query, limit=10):
     """Fetch recent news for a free-text query via Google News RSS."""
+    if feedparser is None:
+        return []
     url = GOOGLE_NEWS_RSS.format(query=quote_plus(query))
     try:
         feed = feedparser.parse(url)
@@ -126,6 +132,8 @@ def get_company_news(company_name, symbol=None, limit=12):
 
 def get_market_news(limit_per_feed=5):
     """General market/macro headlines, not tied to a specific stock."""
+    if feedparser is None:
+        return []
     all_items = []
     for source_name, url in MARKET_RSS_FEEDS.items():
         try:
