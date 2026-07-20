@@ -181,8 +181,8 @@ def sentiment_color(label: str) -> tuple:
 PLOTLY_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Inter, sans-serif", color=COLORS["text_2"], size=12),
-    title_font=dict(family="Inter, sans-serif", color=COLORS["text_1"], size=15),
+    font=dict(family="Inter, Arial, sans-serif", color=COLORS["text_2"], size=12),
+    title_font=dict(family="Inter, Arial, sans-serif", color=COLORS["text_1"], size=15),
     legend=dict(
         bgcolor="rgba(0,0,0,0)",
         font=dict(color=COLORS["text_2"], size=11),

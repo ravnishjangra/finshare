@@ -119,7 +119,8 @@ def create_portfolio_optimization_tab():
                 
                 fig = go.Figure(data=[go.Pie(
                     labels=list(weights.keys()), values=list(weights.values()),
-                    hole=0.5, textinfo='label+percent',
+                    hole=0.5, textinfo='percent',
+textfont=dict(size=9),
                     marker=dict(colors=[strat['color']] + ['#232a3d']*10, line=dict(color=COLORS['bg_1'], width=1)),
                     hovertemplate="%{label}: %{percent}<extra></extra>",
                 )])
