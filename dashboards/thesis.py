@@ -11,6 +11,7 @@ _STATUS_COLOR = {
     'ok': COLORS['neutral'],
     'warn': '#f97316',
     'bad': COLORS['down'],
+    'info': COLORS['accent_3'],
 }
 
 def safe_float(val, default=0):
@@ -70,10 +71,7 @@ def generate_investment_thesis(analyzer, dcf_result=None):
         upside = dcf_result.get('upside')
         if upside is not None:
             max_score += 1
-            # Cap extreme values from data quality issues
-            if abs(upside) > 500:
-                thesis_parts.append(('warn', f"**DCF Unreliable:** Data quality prevents accurate valuation")); score += 0.5
-            elif upside > 20: thesis_parts.append(('good', f"**Significantly Undervalued:** DCF {upside:.0f}% upside")); score += 1
+            if upside > 20: thesis_parts.append(('good', f"**Significantly Undervalued:** DCF {upside:.0f}% upside")); score += 1
             elif upside > 0: thesis_parts.append(('ok', f"**Modestly Undervalued:** DCF {upside:.0f}% upside")); score += 0.5
             else: thesis_parts.append(('bad', f"**Overvalued:** DCF {abs(upside):.0f}% downside"))
     
@@ -100,9 +98,9 @@ def generate_investment_thesis(analyzer, dcf_result=None):
         pass
     
     if market_cap is not None and safe_float(market_cap) > 0:
-        thesis_parts.append(f"📊 **Market Position:** {analyzer.company_name} in **{sector}** with market cap **{analyzer._format_amount(market_cap)}**")
+        thesis_parts.append(('info', f"**Market Position:** {analyzer.company_name} in **{sector}** with market cap **{analyzer._format_amount(market_cap)}**"))
     else:
-        thesis_parts.append(f"📊 **Market Position:** {analyzer.company_name} operates in **{sector}** sector")
+        thesis_parts.append(('info', f"**Market Position:** {analyzer.company_name} operates in **{sector}** sector"))
     
     if max_score > 0:
         final_score = (score/max_score)*100
@@ -143,6 +141,9 @@ def create_investment_thesis_dashboard(analyzer):
                 rg = (analyzer.ratios or {}).get('Revenue Growth (YoY)', 10) or 10
                 rf = 0.072 if (getattr(analyzer, 'currency', 'USD') == 'INR') else 0.045
                 mr = 0.12 if (getattr(analyzer, 'currency', 'USD') == 'INR') else 0.10
+                # Same balance sheet / market cap / tax rate inputs as the
+                # Valuation tab, so this tab's "DCF upside" bullet doesn't
+                # quietly disagree with the main DCF the user already saw.
                 balance = analyzer.financials.get('balance') if hasattr(analyzer, 'financials') else None
                 mcap_for_dcf = (analyzer.live_price_data or {}).get('market_cap')
                 pretax = analyzer._safe_get(income, ['Pretax Income'])
@@ -172,7 +173,7 @@ def create_investment_thesis_dashboard(analyzer):
 
     for status, part in thesis.get('thesis_parts', []):
         color = _STATUS_COLOR.get(status, COLORS['text_2'])
-        st.markdown(f"- <span style='color:{color};font-weight:700;'>●</span> {part}", unsafe_allow_html=True)
+        st.markdown(f"- {status_pill(part, color)}", unsafe_allow_html=True)
 
     st.markdown("---")
     overall_status, overall_text = thesis.get('overall', ('warn', 'No data'))
