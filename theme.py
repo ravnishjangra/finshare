@@ -15,8 +15,8 @@ COLORS = {
     "bg_0": "#05070d",
     "bg_1": "#0a0e17",
     "bg_2": "#10141f",
-    "surface": "#131826",
-    "surface_hover": "#171d2e",
+    "surface": "rgba(19, 24, 38, 0.6)",
+    "surface_hover": "rgba(23, 29, 46, 0.7)",
     "border": "rgba(148, 163, 253, 0.10)",
     "border_strong": "rgba(148, 163, 253, 0.22)",
 
@@ -41,6 +41,128 @@ SERIES_PALETTE = [
     COLORS["neutral"], COLORS["accent_2"], COLORS["down"],
     "#5eead4", "#c084fc",
 ]
+
+# ── Glassmorphism CSS Injection ─────────────────────────────────────────
+GLASS_CSS = """
+<style>
+/* Glass background for cards */
+.card, .stMetric, div[data-testid="stMetric"], 
+.stExpander, div[data-testid="stExpander"],
+.css-1r6slb0, .css-keje6w {
+    background: rgba(19, 24, 38, 0.45) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border: 1px solid rgba(148, 163, 253, 0.12) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Card hover - intensify glass */
+.card:hover, .news-card:hover {
+    background: rgba(23, 29, 46, 0.65) !important;
+    border-color: rgba(148, 163, 253, 0.25) !important;
+    box-shadow: 0 12px 40px rgba(109, 94, 248, 0.12) !important;
+}
+
+/* Sidebar glass */
+.css-1d391kg, section[data-testid="stSidebar"] > div {
+    background: rgba(10, 14, 23, 0.7) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-right: 1px solid rgba(148, 163, 253, 0.08) !important;
+}
+
+/* Input fields glass */
+.stTextInput input, .stSelectbox > div > div {
+    background: rgba(19, 24, 38, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(148, 163, 253, 0.15) !important;
+    border-radius: 12px !important;
+    color: #f4f6fb !important;
+}
+
+/* Buttons glass */
+.stButton button {
+    background: rgba(109, 94, 248, 0.2) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(109, 94, 248, 0.3) !important;
+    border-radius: 12px !important;
+    color: #f4f6fb !important;
+    transition: all 0.3s ease !important;
+}
+
+.stButton button:hover {
+    background: rgba(109, 94, 248, 0.35) !important;
+    border-color: rgba(109, 94, 248, 0.5) !important;
+    box-shadow: 0 4px 20px rgba(109, 94, 248, 0.2) !important;
+}
+
+/* Tabs glass */
+.stTabs [data-baseweb="tab-list"] {
+    background: rgba(19, 24, 38, 0.4) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border-radius: 14px !important;
+    padding: 4px !important;
+    gap: 4px !important;
+}
+
+.stTabs [data-baseweb="tab"] {
+    border-radius: 10px !important;
+    color: #aab1c5 !important;
+}
+
+.stTabs [aria-selected="true"] {
+    background: rgba(109, 94, 248, 0.25) !important;
+    color: #f4f6fb !important;
+}
+
+/* News cards glass */
+.news-card {
+    background: rgba(19, 24, 38, 0.45) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(148, 163, 253, 0.10) !important;
+    border-radius: 14px !important;
+}
+
+/* Section headers */
+.section-header {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f4f6fb;
+    margin-bottom: 1rem;
+}
+
+/* Metric labels */
+.metric-label {
+    font-size: 0.75rem;
+    color: #6b7488;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f4f6fb;
+}
+
+/* App background with gradient for glass to show through */
+.stApp {
+    background: linear-gradient(135deg, #05070d 0%, #0a0e17 30%, #0d1117 60%, #0a0e17 100%) !important;
+}
+</style>
+"""
+
+
+def inject_glass():
+    """Call once in app.py to enable glassmorphism globally."""
+    import streamlit as st
+    st.markdown(GLASS_CSS, unsafe_allow_html=True)
+
 
 def signed_color(value: float) -> str:
     return COLORS["up"] if value is not None and value >= 0 else COLORS["down"]

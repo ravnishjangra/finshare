@@ -1,5 +1,4 @@
 """Finshare Pro - Enterprise Financial Analysis Platform"""
-from dashboards.financial_models import create_financial_models_dashboard
 import streamlit as st
 from datetime import datetime
 from config import *
@@ -17,10 +16,16 @@ from dashboards.portfolio_opt import create_portfolio_optimization_tab
 from dashboards.advanced_portfolio import create_advanced_portfolio_tab
 from dashboards.news import create_news_dashboard
 from dashboards.peer3d import create_peer_3d_scatter
+from dashboards.financial_models import create_financial_models_dashboard
 from components.hero3d import get_hero_html
+from theme import inject_glass
 import streamlit.components.v1 as components
 
+# Must be first Streamlit command
 st.set_page_config(page_title="Finshare Pro", page_icon="📊", layout="wide")
+
+# Inject glassmorphism CSS
+inject_glass()
 
 # ===== FONT LOADING =====
 st.markdown("""
@@ -28,7 +33,6 @@ st.markdown("""
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 """, unsafe_allow_html=True)
-
 st.markdown("""
 <style>
     :root {
