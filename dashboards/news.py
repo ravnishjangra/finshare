@@ -1,8 +1,12 @@
 """News & Sentiment Dashboard — premium headline feed for the searched stock.
 
 Pulls from news/news_engine.py (Google News RSS + yfinance bonus feed,
-both free, no API key) and scores each headline locally with
-nlp/sentiment_engine.py (VADER + financial lexicon, no network calls).
+both free, no API key) and scores each headline with
+nlp/sentiment_engine.py — FinBERT (a finance-tuned BERT model) when
+available, automatically falling back to the original local VADER +
+financial-lexicon scorer if FinBERT can't be loaded (package missing,
+no internet for the model download, etc). Either way, no article text
+is sent anywhere — scoring is local to the process.
 
 This module never touches core/analyzer.py, core/fallback.py, or the
 yfinance ticker cache used by the price-fetch path — it only reads
@@ -17,7 +21,7 @@ import plotly.graph_objects as go
 
 from theme import COLORS, style_fig, section_header, info_box, news_card, gauge_chart, animated_config
 from news.news_engine import get_company_news, get_market_news
-from nlp.sentiment_engine import analyze_articles_batch, aggregate_sentiment
+from nlp.sentiment_engine import analyze_articles_batch, aggregate_sentiment, engine_status
 
 
 def _time_ago(iso_ts):
@@ -125,6 +129,15 @@ def _render_feed(articles, empty_msg):
 def create_news_dashboard(analyzer):
     st.markdown(section_header("📰", "News & Sentiment"), unsafe_allow_html=True)
 
+    status = engine_status()
+    if status["active_engine"] == "finbert":
+        st.caption("🧠 Sentiment engine: **FinBERT** (ProsusAI/finbert) — finance-tuned BERT, blended with an India-market phrase lexicon.")
+    elif status["active_engine"] == "vader+lexicon":
+        reason = " (FinBERT unavailable in this environment)" if not status["finbert_available"] else ""
+        st.caption(f"🔤 Sentiment engine: **VADER + financial lexicon** fallback{reason}.")
+    else:
+        st.caption("🔤 Sentiment engine: **lexicon-only** fallback (VADER not installed).")
+
     company_name = getattr(analyzer, "company_name", None) or getattr(analyzer, "original_ticker", "")
     symbol = getattr(analyzer, "ticker", None)
     sector = (analyzer.financials or {}).get("sector") if getattr(analyzer, "financials", None) else None
@@ -177,8 +190,13 @@ def create_news_dashboard(analyzer):
             st.markdown('<div style="height:0.5rem;"></div>', unsafe_allow_html=True)
             _render_feed(articles, "No headlines available.")
 
+            engine_label = {
+                "finbert": "FinBERT (financial-domain BERT) blended with a keyword lexicon",
+                "vader+lexicon": "VADER + a keyword/financial lexicon heuristic",
+                "lexicon": "a keyword/financial lexicon heuristic",
+            }.get(status["active_engine"], "a local heuristic")
             st.caption(
-                "Sentiment is a local, keyword + VADER heuristic on headline text only — "
+                f"Sentiment is scored locally on headline text only using {engine_label} — "
                 "a directional read, not investment advice. Sources: Google News RSS, Yahoo Finance."
             )
 
