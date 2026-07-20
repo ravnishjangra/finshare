@@ -1,10 +1,14 @@
-"""Main Financial Analyzer - yfinance primary with retry, yahooquery backup"""
+"""Main Financial Analyzer - yfinance primary with retry, yahooquery backup, SerpAPI fallback"""
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import requests
 import time
+import re
 from config import CURRENCY_SYMBOLS, INDIAN_STOCKS_DB
+
+# ===== SERPAPI CONFIG =====
+SERPAPI_KEY = "af2b168b3696668a8ae00fc0f07842ac1e257777edb836f1d749984e023c8f6b"
 
 # ===== GLOBAL TICKER CACHE (10-min TTL) =====
 _TICKER_CACHE = {}
@@ -14,7 +18,7 @@ def _get_cached_ticker(symbol):
     now = time.time()
     if symbol not in _TICKER_CACHE or (now - _TICKER_CACHE[symbol]['time']) > 600:
         if symbol not in _TICKER_CACHE:
-            time.sleep(3.0)  # 3 sec delay only for NEW tickers (rate limit protection)
+            time.sleep(3.0)
         _TICKER_CACHE[symbol] = {
             'ticker': yf.Ticker(symbol),
             'time': now
@@ -48,7 +52,7 @@ class ProFinancialAnalyzer:
         return ticker
 
     def _try_yfinance(self):
-        """Primary source with retry - works for all stocks"""
+        """Primary source with retry"""
         for attempt in range(2):
             try:
                 stock = _get_cached_ticker(self.ticker)
@@ -84,58 +88,8 @@ class ProFinancialAnalyzer:
         
         return False, {}, None
 
-    def _try_tradingview(self):
-        """TradingView data via tvDatafeed - works for US & Indian stocks"""
-        try:
-            from tvDatafeed import TvDatafeed, Interval
-        except ImportError:
-            return {}  # Package not installed (e.g. Streamlit Cloud)
-        
-        try:
-            tv = TvDatafeed()
-            
-            # Determine symbol and exchange
-            if self.ticker.endswith('.NS'):
-                symbol = self.ticker.replace('.NS', '')
-                exchange = 'NSE'
-            elif self.ticker.endswith('.BO'):
-                symbol = self.ticker.replace('.BO', '')
-                exchange = 'BSE'
-            elif self.ticker in ['AAPL','MSFT','GOOGL','AMZN','META','NVDA','TSLA','NFLX','AMD','INTC',
-                                  'JPM','V','WMT','DIS','BA','NKE','PYPL','UBER','BABA','CRM','ADBE',
-                                  'SNAP','RIVN','LCID','PLTR','SNOW','ZM','DOCU','SQ','COIN']:
-                symbol = self.ticker
-                exchange = 'NASDAQ'
-            else:
-                symbol = self.ticker
-                exchange = 'NSE'
-            
-            data = tv.get_hist(symbol=symbol, exchange=exchange, interval=Interval.in_daily, n_bars=5)
-            
-            # If NSE fails for a US stock, try NASDAQ
-            if (data is None or data.empty) and exchange == 'NSE':
-                data = tv.get_hist(symbol=symbol, exchange='NASDAQ', interval=Interval.in_daily, n_bars=5)
-            
-            if data is not None and not data.empty:
-                current_price = float(data['close'].iloc[-1])
-                if current_price > 0:
-                    prev_close = float(data['close'].iloc[-2]) if len(data) > 1 else current_price
-                    return {
-                        'currentPrice': current_price,
-                        'regularMarketPrice': current_price,
-                        'previousClose': prev_close,
-                        'open': float(data['open'].iloc[-1]),
-                        'dayHigh': float(data['high'].iloc[-1]),
-                        'dayLow': float(data['low'].iloc[-1]),
-                        'volume': int(data['volume'].iloc[-1]) if 'volume' in data.columns else 0,
-                    }
-        except Exception:
-            pass
-        
-        return {}
-
     def _try_yahooquery(self):
-        """Backup source"""
+        """Backup source via yahooquery"""
         try:
             from yahooquery import Ticker as YQTicker
             t = YQTicker(self.ticker)
@@ -205,6 +159,43 @@ class ProFinancialAnalyzer:
         except Exception:
             return False, {}
 
+    def _try_serpapi(self):
+        """Fallback: SerpAPI Google Finance (250 free searches/month)"""
+        try:
+            q = self.ticker.replace(".NS", ":NSE").replace(".BO", ":BSE")
+            if ":" not in q:
+                q = self.original_ticker.replace(".NS", ":NSE").replace(".BO", ":BSE")
+            if ":" not in q:
+                q = self.ticker + ":NSE"
+            
+            url = "https://serpapi.com/search"
+            params = {
+                "engine": "google_finance",
+                "q": q,
+                "api_key": SERPAPI_KEY,
+            }
+            resp = requests.get(url, params=params, timeout=10)
+            data = resp.json()
+            summary = data.get("summary", {})
+            price_str = summary.get("price", "")
+            
+            if price_str:
+                match = re.search(r'[\d,]+\.?\d*', price_str)
+                if match:
+                    price = float(match.group().replace(",", ""))
+                    currency = summary.get("currency", "INR" if (self.ticker.endswith('.NS') or self.ticker.endswith('.BO')) else "USD")
+                    return True, {
+                        'currentPrice': price,
+                        'regularMarketPrice': price,
+                        'currency': currency,
+                        'longName': self.original_ticker,
+                        'sector': 'N/A',
+                        'industry': 'N/A',
+                    }
+        except Exception:
+            pass
+        return False, {}
+
     def _try_api_fallback(self):
         """Last resort - Twelve Data / Alpha Vantage"""
         try:
@@ -231,7 +222,7 @@ class ProFinancialAnalyzer:
         return {}, None
 
     def get_live_price(self):
-        """Priority: 1) yfinance 2) TradingView 3) yahooquery 4) API fallbacks"""
+        """Priority: 1) yfinance 2) yahooquery 3) SerpAPI 4) API fallbacks"""
         
         # Try 1: yfinance
         success, info, stock = self._try_yfinance()
@@ -242,19 +233,7 @@ class ProFinancialAnalyzer:
             self.data_source = 'Yahoo Finance'
             return True
 
-        # Try 2: TradingView
-        info = self._try_tradingview()
-        if info and info.get('currentPrice'):
-            self._populate_from_info(info)
-            self._info_cache = info
-            self.data_source = 'TradingView'
-            try:
-                self.stock = _get_cached_ticker(self.ticker)
-            except:
-                pass
-            return True
-
-        # Try 3: yahooquery
+        # Try 2: yahooquery
         success, info = self._try_yahooquery()
         if success and info.get('currentPrice'):
             self._populate_from_info(info)
@@ -263,7 +242,19 @@ class ProFinancialAnalyzer:
             self.stock = _get_cached_ticker(self.ticker)
             return True
 
-        # Try 4: API fallbacks
+        # Try 3: SerpAPI Google Finance
+        success, info = self._try_serpapi()
+        if success and info.get('currentPrice'):
+            self._populate_from_info(info)
+            self._info_cache = info
+            self.data_source = 'Google Finance (SerpAPI)'
+            try:
+                self.stock = _get_cached_ticker(self.ticker)
+            except:
+                pass
+            return True
+
+        # Try 4: API fallbacks (Twelve Data / Alpha Vantage)
         info, source = self._try_api_fallback()
         if info:
             self.live_price_data = {'current_price': info.get('currentPrice')}
