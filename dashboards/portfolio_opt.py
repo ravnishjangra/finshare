@@ -120,11 +120,11 @@ def create_portfolio_optimization_tab():
                 fig = go.Figure(data=[go.Pie(
                     labels=list(weights.keys()), values=list(weights.values()),
                     hole=0.5, textinfo='label+percent',
-                    marker=dict(colors=[strat['color']] + ['#232a3d']*10, line=dict(color=COLORS['bg_1'], width=1))
+                    marker=dict(colors=[strat['color']] + ['#232a3d']*10, line=dict(color=COLORS['bg_1'], width=1)),
+                    hovertemplate="%{label}: %{percent}<extra></extra>",
                 )])
-                fig.update_layout(height=250, margin=dict(t=0,b=0,l=10,r=10), showlegend=False,
-                                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig, use_container_width=True)
+                fig.update_layout(height=250, margin=dict(t=0,b=0,l=10,r=10), showlegend=False)
+                st.plotly_chart(style_fig(fig), use_container_width=True)
         
         # ===== COMPARISON TABLE =====
         st.markdown("### 📈 Performance Comparison")
@@ -145,7 +145,8 @@ def create_portfolio_optimization_tab():
                 mode='markers+text', name=s['name'], text=[s['name']],
                 textposition='top center',
                 marker=dict(size=22, color=s['color'], line=dict(width=2, color='white')),
-                textfont=dict(size=10)
+                textfont=dict(size=10),
+                hovertemplate=f"{s['name']}<br>Risk: " + "%{x:.1f}%<br>Return: %{y:.1f}%<extra></extra>",
             ))
         fig.update_layout(xaxis_title='Risk (Volatility %)', yaxis_title='Return (%)',
                           height=400, showlegend=False)

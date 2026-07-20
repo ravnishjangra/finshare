@@ -2,7 +2,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 from analytics.index_compare import IndexComparison
-from theme import COLORS, style_fig
+from theme import COLORS, style_fig, area_trace
 
 def create_index_comparison_dashboard(analyzer):
     st.markdown('<div class="section-header">📊 Index & Sector Comparison</div>', unsafe_allow_html=True)
@@ -28,7 +28,25 @@ def create_index_comparison_dashboard(analyzer):
         col4.metric("Beta", f"{comp['beta']:.2f}")
         
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=comp['stock_cumulative'].index, y=comp['stock_cumulative'].values, name=analyzer.company_name[:20], line=dict(color=COLORS['accent_1'], width=3)))
-        fig.add_trace(go.Scatter(x=comp['benchmark_cumulative'].index, y=comp['benchmark_cumulative'].values, name=benchmark_name, line=dict(color=COLORS['text_3'], width=2, dash='dash')))
-        fig.update_layout(title=f'Total Return Comparison • {selected}', height=500)
+        stock_area, stock_marker = area_trace(
+            comp['stock_cumulative'].index, comp['stock_cumulative'].values,
+            color=COLORS['accent_1'], name=analyzer.company_name[:20], spline=False,
+        )
+        fig.add_trace(stock_area)
+        fig.add_trace(stock_marker)
+        fig.add_trace(go.Scatter(
+            x=comp['benchmark_cumulative'].index, y=comp['benchmark_cumulative'].values,
+            name=benchmark_name, line=dict(color=COLORS['text_3'], width=2, dash='dash'),
+            hovertemplate=f"{benchmark_name}: " + "%{y:,.2f}<extra></extra>",
+        ))
+        bench_last_x = comp['benchmark_cumulative'].index[-1]
+        bench_last_y = comp['benchmark_cumulative'].values[-1]
+        fig.add_trace(go.Scatter(
+            x=[bench_last_x], y=[bench_last_y], mode='markers+text', showlegend=False,
+            marker=dict(size=8, color=COLORS['text_3'], line=dict(width=2, color=COLORS['bg_0'])),
+            text=[f"{bench_last_y:.2f}"], textposition='middle right',
+            textfont=dict(color=COLORS['text_3'], size=11, family='Inter, sans-serif'),
+            hoverinfo='skip',
+        ))
+        fig.update_layout(title=f'Total Return Comparison • {selected}', height=500, hovermode='x unified')
         st.plotly_chart(style_fig(fig), use_container_width=True)

@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 import pandas as pd
-from theme import COLORS, style_fig
+from theme import COLORS, style_fig, status_pill, metric_card
 
 
 def _wilder_smooth(series, period):
@@ -107,8 +107,12 @@ def create_technical_dashboard(analyzer):
 
     # ── Headline metrics ──
     rsi_now = rsi.iloc[-1]
-    macd_sig = "Bullish 🟢" if macd.iloc[-1] > signal.iloc[-1] else "Bearish 🔴"
-    trend = "Golden Cross ✨" if sma50.iloc[-1] > sma200.iloc[-1] else "Death Cross 💀"
+    macd_bullish = macd.iloc[-1] > signal.iloc[-1]
+    macd_sig = "Bullish" if macd_bullish else "Bearish"
+    macd_color = COLORS['up'] if macd_bullish else COLORS['down']
+    golden_cross = sma50.iloc[-1] > sma200.iloc[-1]
+    trend = "Golden Cross" if golden_cross else "Death Cross"
+    trend_color = COLORS['up'] if golden_cross else COLORS['down']
     adx_now = adx.iloc[-1] if pd.notna(adx.iloc[-1]) else 0
     adx_strength = "Strong" if adx_now > 25 else ("Weak/Range" if adx_now < 20 else "Developing")
     vol_ratio = (volume.iloc[-1] / vol_ma20.iloc[-1]) if vol_ma20.iloc[-1] else 1
@@ -116,14 +120,23 @@ def create_technical_dashboard(analyzer):
 
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     col1.metric("RSI (14)", f"{rsi_now:.1f}", "Overbought" if rsi_now > 70 else ("Oversold" if rsi_now < 30 else "Neutral"))
-    col2.metric("MACD", f"{macd.iloc[-1]:.2f}", delta=macd_sig)
+    with col2:
+        st.markdown(
+            metric_card("MACD", f"{macd.iloc[-1]:.2f}", value_color=macd_color,
+                        footer=status_pill(macd_sig, macd_color)),
+            unsafe_allow_html=True,
+        )
     col3.metric("Stochastic %K", f"{stoch_now:.0f}", "Overbought" if stoch_now > 80 else ("Oversold" if stoch_now < 20 else "Neutral"))
     col4.metric("ADX (14)", f"{adx_now:.1f}", adx_strength)
     col5.metric("ATR (14)", f"{atr_pct.iloc[-1]:.2f}%", "of price")
     col6.metric("Volume vs 20D Avg", f"{vol_ratio:.2f}x", "Elevated" if vol_ratio > 1.5 else "Normal")
 
     col7, col8, col9 = st.columns(3)
-    col7.metric("Trend (50/200 SMA)", trend.split(' ')[0])
+    with col7:
+        st.markdown(
+            metric_card("Trend (50/200 SMA)", trend, value_color=trend_color),
+            unsafe_allow_html=True,
+        )
     col8.metric("Hist. Volatility (20D, ann.)", f"{hist_vol_20.iloc[-1]:.1f}%")
     col9.metric("Close", f"{cur}{close.iloc[-1]:.2f}")
 

@@ -1,7 +1,17 @@
 """AI Investment Thesis Dashboard - BULLETPROOF"""
 import streamlit as st
 from models.dcf import AdvancedDCF
-from theme import COLORS
+from theme import COLORS, status_pill, card_html
+
+# Maps the same semantic levels the thesis previously encoded via raw
+# 🟢🟡🟠🔴 emoji onto the shared design-system colors, rendered as a
+# status_pill() dot instead (see status_pill in theme.py).
+_STATUS_COLOR = {
+    'good': COLORS['up'],
+    'ok': COLORS['neutral'],
+    'warn': '#f97316',
+    'bad': COLORS['down'],
+}
 
 def safe_float(val, default=0):
     """Safely convert to float"""
@@ -23,53 +33,53 @@ def generate_investment_thesis(analyzer, dcf_result=None):
     rev_growth = ratios.get('Revenue Growth (YoY)')
     if rev_growth is not None:
         max_score += 1
-        if rev_growth > 20: thesis_parts.append(f"🟢 **Strong Revenue Growth:** {rev_growth:.1f}% YoY"); score += 1
-        elif rev_growth > 10: thesis_parts.append(f"🟡 **Moderate Revenue Growth:** {rev_growth:.1f}% YoY"); score += 0.5
-        elif rev_growth > 0: thesis_parts.append(f"🟠 **Slow Revenue Growth:** {rev_growth:.1f}% YoY")
-        else: thesis_parts.append(f"🔴 **Revenue Decline:** {abs(rev_growth):.1f}% YoY")
+        if rev_growth > 20: thesis_parts.append(('good', f"**Strong Revenue Growth:** {rev_growth:.1f}% YoY")); score += 1
+        elif rev_growth > 10: thesis_parts.append(('ok', f"**Moderate Revenue Growth:** {rev_growth:.1f}% YoY")); score += 0.5
+        elif rev_growth > 0: thesis_parts.append(('warn', f"**Slow Revenue Growth:** {rev_growth:.1f}% YoY"))
+        else: thesis_parts.append(('bad', f"**Revenue Decline:** {abs(rev_growth):.1f}% YoY"))
     
     net_margin = ratios.get('Net Profit Margin')
     if net_margin is not None:
         max_score += 1
-        if net_margin > 20: thesis_parts.append(f"🟢 **Excellent Profitability:** {net_margin:.1f}% net margin"); score += 1
-        elif net_margin > 10: thesis_parts.append(f"🟡 **Healthy Profitability:** {net_margin:.1f}% net margin"); score += 0.5
-        else: thesis_parts.append(f"🟠 **Thin Margins:** {net_margin:.1f}%")
+        if net_margin > 20: thesis_parts.append(('good', f"**Excellent Profitability:** {net_margin:.1f}% net margin")); score += 1
+        elif net_margin > 10: thesis_parts.append(('ok', f"**Healthy Profitability:** {net_margin:.1f}% net margin")); score += 0.5
+        else: thesis_parts.append(('warn', f"**Thin Margins:** {net_margin:.1f}%"))
     
     roe = ratios.get('ROE')
     if roe is not None:
         max_score += 1
-        if roe > 20: thesis_parts.append(f"🟢 **Efficient Capital Allocation:** ROE {roe:.1f}%"); score += 1
-        elif roe > 10: thesis_parts.append(f"🟡 **Adequate Returns:** ROE {roe:.1f}%"); score += 0.5
-        else: thesis_parts.append(f"🔴 **Poor Returns:** ROE {roe:.1f}%")
+        if roe > 20: thesis_parts.append(('good', f"**Efficient Capital Allocation:** ROE {roe:.1f}%")); score += 1
+        elif roe > 10: thesis_parts.append(('ok', f"**Adequate Returns:** ROE {roe:.1f}%")); score += 0.5
+        else: thesis_parts.append(('bad', f"**Poor Returns:** ROE {roe:.1f}%"))
     
     de = ratios.get('Debt to Equity')
     if de is not None:
         max_score += 1
-        if de < 0.5: thesis_parts.append(f"🟢 **Conservative Capital Structure:** D/E {de:.2f}"); score += 1
-        elif de < 1.5: thesis_parts.append(f"🟡 **Moderate Leverage:** D/E {de:.2f}"); score += 0.5
-        else: thesis_parts.append(f"🔴 **High Leverage:** D/E {de:.2f}")
+        if de < 0.5: thesis_parts.append(('good', f"**Conservative Capital Structure:** D/E {de:.2f}")); score += 1
+        elif de < 1.5: thesis_parts.append(('ok', f"**Moderate Leverage:** D/E {de:.2f}")); score += 0.5
+        else: thesis_parts.append(('bad', f"**High Leverage:** D/E {de:.2f}"))
     
     cr = ratios.get('Current Ratio')
     if cr is not None:
         max_score += 1
-        if cr > 1.5: thesis_parts.append(f"🟢 **Healthy Liquidity:** Current Ratio {cr:.2f}"); score += 1
-        elif cr > 1.0: thesis_parts.append(f"🟡 **Adequate Liquidity:** {cr:.2f}"); score += 0.5
-        else: thesis_parts.append(f"🔴 **Liquidity Concern:** {cr:.2f}")
+        if cr > 1.5: thesis_parts.append(('good', f"**Healthy Liquidity:** Current Ratio {cr:.2f}")); score += 1
+        elif cr > 1.0: thesis_parts.append(('ok', f"**Adequate Liquidity:** {cr:.2f}")); score += 0.5
+        else: thesis_parts.append(('bad', f"**Liquidity Concern:** {cr:.2f}"))
     
     if dcf_result:
         upside = dcf_result.get('upside')
         if upside is not None:
             max_score += 1
-            if upside > 20: thesis_parts.append(f"🟢 **Significantly Undervalued:** DCF {upside:.0f}% upside"); score += 1
-            elif upside > 0: thesis_parts.append(f"🟡 **Modestly Undervalued:** DCF {upside:.0f}% upside"); score += 0.5
-            else: thesis_parts.append(f"🔴 **Overvalued:** DCF {abs(upside):.0f}% downside")
+            if upside > 20: thesis_parts.append(('good', f"**Significantly Undervalued:** DCF {upside:.0f}% upside")); score += 1
+            elif upside > 0: thesis_parts.append(('ok', f"**Modestly Undervalued:** DCF {upside:.0f}% upside")); score += 0.5
+            else: thesis_parts.append(('bad', f"**Overvalued:** DCF {abs(upside):.0f}% downside"))
     
     eps = ratios.get('EPS')
     ni_growth = ratios.get('Net Income Growth (YoY)')
     if eps is not None and ni_growth is not None:
         max_score += 1
-        if ni_growth > 15 and eps > 0: thesis_parts.append(f"🟢 **Strong Earnings:** EPS {cur}{eps:.2f}, growth {ni_growth:.1f}%"); score += 1
-        elif eps > 0: thesis_parts.append(f"🟡 **Stable Earnings:** EPS {cur}{eps:.2f}"); score += 0.5
+        if ni_growth > 15 and eps > 0: thesis_parts.append(('good', f"**Strong Earnings:** EPS {cur}{eps:.2f}, growth {ni_growth:.1f}%")); score += 1
+        elif eps > 0: thesis_parts.append(('ok', f"**Stable Earnings:** EPS {cur}{eps:.2f}")); score += 0.5
     
     # SAFEST market cap check
     market_cap = None
@@ -93,11 +103,11 @@ def generate_investment_thesis(analyzer, dcf_result=None):
     
     if max_score > 0:
         final_score = (score/max_score)*100
-        if final_score >= 75: overall = "🟢 **OVERALL: STRONG FUNDAMENTALS**"
-        elif final_score >= 50: overall = "🟡 **OVERALL: MIXED SIGNALS**"
-        elif final_score >= 25: overall = "🟠 **OVERALL: BELOW AVERAGE**"
-        else: overall = "🔴 **OVERALL: HIGH RISK**"
-    else: overall = "⚠️ **INSUFFICIENT DATA**"
+        if final_score >= 75: overall = ('good', "OVERALL: STRONG FUNDAMENTALS")
+        elif final_score >= 50: overall = ('ok', "OVERALL: MIXED SIGNALS")
+        elif final_score >= 25: overall = ('warn', "OVERALL: BELOW AVERAGE")
+        else: overall = ('bad', "OVERALL: HIGH RISK")
+    else: overall = ('warn', "⚠️ INSUFFICIENT DATA")
     
     return {'thesis_parts': thesis_parts, 'overall': overall, 'score': f"{score}/{max_score}" if max_score > 0 else "N/A", 'score_pct': (score/max_score*100) if max_score > 0 else 0}
 
@@ -152,7 +162,20 @@ def create_investment_thesis_dashboard(analyzer):
     score_pct = thesis.get('score_pct', 0) or 0
     score_color = COLORS['up'] if score_pct >= 75 else COLORS['neutral'] if score_pct >= 50 else COLORS['down']
     
-    st.markdown(f'<div style="background:linear-gradient(160deg,{COLORS["surface"]},{COLORS["bg_2"]});border:1px solid {score_color}55;border-left:3px solid {score_color};padding:1.5rem;border-radius:16px;margin-bottom:1rem;box-shadow:0 8px 24px rgba(0,0,0,0.3);"><div style="display:flex;justify-content:space-between;align-items:center;"><h3 style="color:{COLORS["text_1"]};margin:0;">📝 {analyzer.company_name}</h3><span style="font-size:1.5rem;font-weight:900;color:{score_color};">{thesis.get("score", "N/A")}</span></div></div>', unsafe_allow_html=True)
-    for part in thesis.get('thesis_parts', []): st.markdown(f"- {part}")
-    st.markdown("---"); st.markdown(f"### {thesis.get('overall', '⚠️ No data')}")
+    header_inner = (
+        f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+        f'<h3 style="color:{COLORS["text_1"]};margin:0;">📝 {analyzer.company_name}</h3>'
+        f'<span style="font-size:1.5rem;font-weight:900;color:{score_color};">{thesis.get("score", "N/A")}</span>'
+        f'</div>'
+    )
+    st.markdown(card_html(header_inner, accent=score_color), unsafe_allow_html=True)
+
+    for status, part in thesis.get('thesis_parts', []):
+        color = _STATUS_COLOR.get(status, COLORS['text_2'])
+        st.markdown(f"- {status_pill(part, color)}", unsafe_allow_html=True)
+
+    st.markdown("---")
+    overall_status, overall_text = thesis.get('overall', ('warn', 'No data'))
+    overall_color = _STATUS_COLOR.get(overall_status, COLORS['text_2'])
+    st.markdown(f'<h3 style="color:{overall_color};">{overall_text}</h3>', unsafe_allow_html=True)
     st.caption("💡 Auto-generated from reported financial data.")

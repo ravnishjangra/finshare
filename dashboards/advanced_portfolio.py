@@ -180,7 +180,8 @@ def create_advanced_portfolio_tab():
                 x=vols, y=rets, mode='markers+lines',
                 marker=dict(size=4, color=sharpes, colorscale=[[0, COLORS['bg_2']], [0.5, COLORS['accent_1']], [1, COLORS['accent_3']]], showscale=True,
                            colorbar=dict(title='Sharpe')),
-                line=dict(color=COLORS['accent_1'], width=2), name='Efficient Frontier'
+                line=dict(color=COLORS['accent_1'], width=2), name='Efficient Frontier',
+                hovertemplate="Risk: %{x:.1f}%<br>Return: %{y:.1f}%<extra></extra>",
             ))
             
             best_idx = np.argmax(sharpes)
@@ -189,12 +190,14 @@ def create_advanced_portfolio_tab():
             fig.add_trace(go.Scatter(
                 x=[vols[best_idx]], y=[rets[best_idx]], mode='markers+text',
                 marker=dict(size=20, color=COLORS['up'], symbol='star'),
-                text=['Max Sharpe'], textposition='top center', name='Max Sharpe'
+                text=['Max Sharpe'], textposition='top center', name='Max Sharpe',
+                hovertemplate=f"Max Sharpe<br>Risk: {vols[best_idx]:.1f}%<br>Return: {rets[best_idx]:.1f}%<br>Sharpe: {sharpes[best_idx]:.2f}<extra></extra>",
             ))
             fig.add_trace(go.Scatter(
                 x=[vols[min_vol_idx]], y=[rets[min_vol_idx]], mode='markers+text',
                 marker=dict(size=15, color=COLORS['neutral'], symbol='diamond'),
-                text=['Min Vol'], textposition='top center', name='Min Vol'
+                text=['Min Vol'], textposition='top center', name='Min Vol',
+                hovertemplate=f"Min Vol<br>Risk: {vols[min_vol_idx]:.1f}%<br>Return: {rets[min_vol_idx]:.1f}%<extra></extra>",
             ))
             
             fig.update_layout(xaxis_title='Risk (Volatility %)', yaxis_title='Return (%)',
@@ -211,7 +214,10 @@ def create_advanced_portfolio_tab():
         for name, w in strategies_bt.items():
             cum, _ = ap.backtest(w)
             if not cum.empty:
-                fig.add_trace(go.Scatter(x=cum.index, y=cum.values, name=name, line=dict(width=2)))
+                fig.add_trace(go.Scatter(
+                    x=cum.index, y=cum.values, name=name, line=dict(width=2),
+                    hovertemplate=f"{name}: " + "%{y:.1f}<extra></extra>",
+                ))
         
         bench_w = np.zeros(n)
         bench_w[0] = 1
@@ -219,7 +225,8 @@ def create_advanced_portfolio_tab():
         if not bench_cum.empty:
             fig.add_trace(go.Scatter(
                 x=bench_cum.index, y=bench_cum.values,
-                name=f'{tickers[0]} (Benchmark)', line=dict(width=1, dash='dash', color=COLORS['text_3'])
+                name=f'{tickers[0]} (Benchmark)', line=dict(width=1, dash='dash', color=COLORS['text_3']),
+                hovertemplate=f"{tickers[0]} (Benchmark): " + "%{y:.1f}<extra></extra>",
             ))
         
         fig.update_layout(title='Portfolio Performance Comparison', xaxis_title='Date',
@@ -237,13 +244,15 @@ def create_advanced_portfolio_tab():
         
         fig.add_trace(go.Scatter(
             x=cum100.index, y=cum100.values, name='Portfolio Value',
-            line=dict(color=COLORS['accent_1'], width=2)
+            line=dict(color=COLORS['accent_1'], width=2),
+            hovertemplate="Value: %{y:.1f}<extra></extra>",
         ), row=1, col=1)
         
         fig.add_trace(go.Scatter(
             x=dd_series.index, y=dd_series.values, name='Drawdown %',
             fill='tozeroy', line=dict(color=COLORS['down'], width=1),
-            fillcolor='rgba(255,93,122,0.18)'
+            fillcolor='rgba(255,93,122,0.18)',
+            hovertemplate="Drawdown: %{y:.1f}%<extra></extra>",
         ), row=2, col=1)
         
         fig.add_hline(y=0, line_color=COLORS['text_3'], row=2, col=1)
@@ -269,16 +278,41 @@ def create_advanced_portfolio_tab():
             sims = ap.monte_carlo(w_ms, years=mc_years, sims=5000)
         
         fig = go.Figure()
+        paths = {p: np.percentile(sims, p, axis=1) for p in [5, 25, 50, 75, 95]}
+        x_days = list(range(len(paths[50])))
+
+        # Outer fan: 5th–95th percentile band (low-alpha fill between two invisible boundary lines)
+        fig.add_trace(go.Scatter(x=x_days, y=paths[5], mode='lines',
+                                  line=dict(width=0), hoverinfo='skip', showlegend=False))
+        fig.add_trace(go.Scatter(x=x_days, y=paths[95], mode='lines',
+                                  line=dict(width=0), fill='tonexty', fillcolor='rgba(109,94,248,0.10)',
+                                  hoverinfo='skip', showlegend=False, name='5th–95th range'))
+        # Inner fan: 25th–75th percentile band (darker shade for the tighter range)
+        fig.add_trace(go.Scatter(x=x_days, y=paths[25], mode='lines',
+                                  line=dict(width=0), hoverinfo='skip', showlegend=False))
+        fig.add_trace(go.Scatter(x=x_days, y=paths[75], mode='lines',
+                                  line=dict(width=0), fill='tonexty', fillcolor='rgba(109,94,248,0.22)',
+                                  hoverinfo='skip', showlegend=False, name='25th–75th range'))
+
         for p, c in zip([5, 25, 50, 75, 95], [COLORS['down'], COLORS['neutral'], COLORS['up'], COLORS['accent_3'], COLORS['accent_1']]):
-            path = np.percentile(sims, p, axis=1)
+            path = paths[p]
             fig.add_trace(go.Scatter(
                 y=path, mode='lines',
-                line=dict(color=c, width=2 if p == 50 else 1),
-                name=f'{p}th Percentile'
+                line=dict(color=c, width=2.5 if p == 50 else 1),
+                name=f'{p}th Percentile',
+                hovertemplate=f'{p}th Percentile: ' + '%{y:.1f}<extra></extra>',
             ))
+            if p == 50:
+                fig.add_trace(go.Scatter(
+                    x=[x_days[-1]], y=[path[-1]], mode='markers+text', showlegend=False,
+                    marker=dict(size=9, color=c, line=dict(width=2, color=COLORS['bg_0'])),
+                    text=[f"{path[-1]:.0f}"], textposition='middle right',
+                    textfont=dict(color=c, size=11, family='Inter, sans-serif'),
+                    hoverinfo='skip',
+                ))
         
         fig.update_layout(title=f'5,000 Simulated Portfolio Paths', xaxis_title='Trading Days',
-                         yaxis_title='Portfolio Value ($)', height=400)
+                         yaxis_title='Portfolio Value ($)', height=400, hovermode='x unified')
         st.plotly_chart(style_fig(fig), use_container_width=True)
         
         final_values = sims[-1]

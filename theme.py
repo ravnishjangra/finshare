@@ -226,7 +226,16 @@ def animated_config():
     }
 
 
-def metric_card(label: str, value: str, delta: str = None, positive: bool = True) -> str:
+def metric_card(label: str, value: str, delta: str = None, positive: bool = True,
+                 value_color: str = None, accent: str = None, sublabel: str = None,
+                 footer: str = None, center: bool = False, min_height: str = None) -> str:
+    """Shared metric/stat card. Extended (beyond label/value/delta) with:
+    - value_color: overrides the value's text color (e.g. status-driven color)
+    - accent: adds a colored 2px top border, for factor/category cards
+    - sublabel: small colored line under the value (e.g. a classification word)
+    - footer: extra small muted line at the bottom (e.g. a detail string)
+    - center: center-aligns the card's content
+    """
     delta_html = ""
     if delta:
         color = COLORS["up"] if positive else COLORS["down"]
@@ -236,20 +245,72 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
             f'font-weight:700;padding:0.15rem 0.5rem;border-radius:999px;margin-left:0.4rem;">'
             f'{delta}</span>'
         )
+    value_style = f'color:{value_color};' if value_color else ''
+    sub_html = (
+        f'<div style="font-size:0.85rem;font-weight:600;color:{value_color or COLORS["text_2"]};margin-top:0.15rem;">{sublabel}</div>'
+        if sublabel else ''
+    )
+    footer_html = (
+        f'<div style="font-size:0.65rem;color:{COLORS["text_3"]};margin-top:0.5rem;line-height:1.35;">{footer}</div>'
+        if footer else ''
+    )
+    border_style = f'border-top:2px solid {accent};' if accent else ''
+    align_style = 'text-align:center;' if center else ''
+    height_style = f'min-height:{min_height};' if min_height else ''
     return (
-        f'<div class="card animate-in">'
-        f'<div class="metric-value">{value}{delta_html}</div>'
+        f'<div class="card animate-in" style="{border_style}{align_style}{height_style}">'
+        f'<div class="metric-value" style="{value_style}">{value}{delta_html}</div>'
         f'<div class="metric-label">{label}</div>'
+        f'{sub_html}{footer_html}'
         f'</div>'
     )
+
+
+def card_html(inner_html: str, accent: str = None, center: bool = False, min_height: str = None) -> str:
+    """Wraps arbitrary inner HTML in the shared `.card` shell so any bespoke
+    card content (score displays, legends, headers) gets identical
+    border-radius / padding / shadow / hover behavior as metric_card()."""
+    border = f'border-top:2px solid {accent};' if accent else ''
+    align = 'text-align:center;' if center else ''
+    height = f'min-height:{min_height};' if min_height else ''
+    return f'<div class="card animate-in" style="{border}{align}{height}">{inner_html}</div>'
 
 
 def section_header(icon: str, title: str) -> str:
     return f'<div class="section-header">{icon} {title}</div>'
 
 
-def info_box(text: str) -> str:
-    return f'<div class="info-box">{text}</div>'
+def info_box(text: str, accent: str = None) -> str:
+    style = f'style="border-left-color:{accent};"' if accent else ''
+    return f'<div class="info-box" {style}>{text}</div>'
+
+
+def status_pill(label: str, color: str) -> str:
+    """Colored-dot + label pill for status/severity indicators — a consistent
+    replacement for raw traffic-light emoji (🟢🟡🟠🔴) across the app."""
+    return (
+        f'<span style="display:inline-flex;align-items:center;gap:0.35rem;'
+        f'background:{color}1F;color:{color};font-size:0.78rem;font-weight:700;'
+        f'letter-spacing:0.2px;padding:0.2rem 0.6rem;border-radius:999px;white-space:nowrap;">'
+        f'<span style="color:{color};">●</span> {label}</span>'
+    )
+
+
+def progress_bar(label: str, value: float, max_value: float, color: str = None) -> str:
+    """Reusable HTML/CSS progress bar (replaces '█'*n + '░'*(n) style ASCII bars),
+    animated via the .grow-bar keyframe already defined in app.py's CSS."""
+    max_value = max_value or 1
+    frac = 0 if max_value == 0 else max(0.0, min(1.0, value / max_value))
+    bar_color = color or COLORS["accent_1"]
+    return (
+        f'<div style="margin:0.35rem 0 0.7rem 0;">'
+        f'<div style="display:flex;justify-content:space-between;font-size:0.8rem;color:{COLORS["text_2"]};margin-bottom:0.3rem;">'
+        f'<span>{label}</span><span style="color:{bar_color};font-weight:700;">{value:g}/{max_value:g}</span>'
+        f'</div>'
+        f'<div style="height:8px;border-radius:4px;background:{COLORS["border"]};overflow:hidden;">'
+        f'<div class="grow-bar" style="height:100%;width:{frac*100:.1f}%;background:{bar_color};border-radius:4px;"></div>'
+        f'</div></div>'
+    )
 
 
 def score_badge(label: str, score: float, max_score: float, thresholds=(0.33, 0.66)) -> str:
@@ -350,6 +411,47 @@ def style_fig_3d(fig, x_title="", y_title="", z_title="", eye=(1.6, 1.5, 1.15), 
         margin=dict(l=0, r=0, t=40, b=0),
     )
     return fig
+
+
+def _hex_to_rgba(color: str, alpha: float) -> str:
+    """Best-effort conversion of a hex color (or passthrough of an already
+    rgba()/rgb() string) to an rgba() string with the given alpha."""
+    if color.startswith("rgba(") or color.startswith("rgb("):
+        return color
+    c = color.lstrip("#")
+    if len(c) == 3:
+        c = "".join(ch * 2 for ch in c)
+    try:
+        r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+        return f"rgba({r},{g},{b},{alpha})"
+    except Exception:
+        return color
+
+
+def area_trace(x, y, color: str, name: str = None, spline: bool = True, fill_alpha: float = 0.14):
+    """Returns a go.Scatter configured as a gradient-filled line with a
+    highlighted last-point marker + inline label — the shared look for
+    equity-curve / cumulative-return / price-line charts across dashboards."""
+    import plotly.graph_objects as go
+
+    x = list(x)
+    y = list(y)
+    last_x = x[-1] if x else None
+    last_y = y[-1] if y else None
+    last_label = f"{last_y:.2f}" if isinstance(last_y, (int, float)) else str(last_y)
+
+    return go.Scatter(
+        x=x, y=y, mode="lines", name=name,
+        line=dict(color=color, width=2.5, shape="spline" if spline else "linear"),
+        fill="tozeroy", fillcolor=_hex_to_rgba(color, fill_alpha),
+        hovertemplate=f"{name or ''}: " + "%{y:,.2f}<extra></extra>",
+    ), go.Scatter(
+        x=[last_x], y=[last_y], mode="markers+text", showlegend=False,
+        marker=dict(size=9, color=color, line=dict(width=2, color=COLORS["bg_0"])),
+        text=[last_label], textposition="middle right",
+        textfont=dict(color=color, size=11, family="Inter, sans-serif"),
+        hoverinfo="skip",
+    )
 
 
 def gauge_chart(value: float, title: str = "Sentiment", lo: float = -1.0, hi: float = 1.0):

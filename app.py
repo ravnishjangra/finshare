@@ -118,6 +118,53 @@ st.markdown("""
     .empty-state p { color: var(--text-2); font-size: 1rem; margin: 0.2rem 0; }
     .empty-state .muted { color: var(--text-3); font-size: 0.85rem; }
     .app-footer { text-align: center; color: var(--text-3); font-size: 0.78rem; letter-spacing: 0.3px; padding-bottom: 1rem; }
+
+    /* ===== Part 3.11 — tabular numerals everywhere numbers are displayed ===== */
+    [data-testid="stMetricValue"], [data-testid="stMetricDelta"], .metric-value,
+    [data-testid="stDataFrame"] td, [data-testid="stDataFrameResizable"] td,
+    .stNumberInput input, table td { font-variant-numeric: tabular-nums; }
+
+    /* ===== Part 4.13 — coverage for default-styled Streamlit widgets ===== */
+    div[data-baseweb="select"] > div, div[data-baseweb="popover"] ul[role="listbox"] {
+        background: var(--surface) !important; border: 1px solid var(--border) !important;
+        border-radius: var(--radius-sm) !important; color: var(--text-1) !important;
+    }
+    div[data-baseweb="select"] > div:focus-within { border-color: var(--accent-1) !important; box-shadow: 0 0 0 3px rgba(109,94,248,0.15) !important; }
+    li[role="option"]:hover, li[aria-selected="true"] { background: rgba(109,94,248,0.18) !important; }
+    .stSlider [data-baseweb="slider"] div[role="slider"] { background: var(--accent-1) !important; box-shadow: 0 0 0 4px rgba(109,94,248,0.18) !important; }
+    .stSlider [data-testid="stTickBar"] { display: none; }
+    .stSlider div[data-baseweb="slider"] > div > div { background: var(--accent-grad) !important; }
+    .stSlider div[data-baseweb="slider"] > div { background: var(--border) !important; }
+    .stMultiSelect span[data-baseweb="tag"] { background: var(--accent-grad) !important; border-radius: var(--radius-sm) !important; color: white !important; }
+    .stCheckbox label span[aria-checked="true"], .stCheckbox [data-baseweb="checkbox"] span { border-color: var(--border-strong) !important; }
+    .stCheckbox [data-baseweb="checkbox"] div[aria-checked="true"] { background: var(--accent-1) !important; border-color: var(--accent-1) !important; }
+    .stRadio [data-baseweb="radio"] div:first-child { border-color: var(--border-strong) !important; }
+    .stRadio [aria-checked="true"] div:first-child { border-color: var(--accent-1) !important; }
+    .stRadio [aria-checked="true"] div:first-child div { background: var(--accent-1) !important; }
+    .stNumberInput input { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius-sm) !important; color: var(--text-1) !important; }
+    [data-testid="stDataFrame"] [role="columnheader"], [data-testid="stDataFrameResizable"] [role="columnheader"] {
+        background: var(--bg-1) !important; color: var(--text-2) !important; font-weight: 700 !important;
+        text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.72rem !important;
+        border-bottom: 1px solid var(--border-strong) !important;
+    }
+
+    /* ===== Part 4.14 — layered depth system: bg -> card -> nested element ===== */
+    .card [data-testid="stExpander"], .card > div[data-baseweb], .info-box, .stAlert,
+    [data-testid="stMetric"] { background: var(--surface-hover) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03); }
+
+    /* ===== Part 4.15 — faint noise/grain overlay to prevent gradient banding ===== */
+    .stApp::before {
+        content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.025;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    }
+
+    /* ===== Part 4.16 — skeleton/shimmer loading placeholder ===== */
+    @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+    .skeleton-card {
+        border-radius: var(--radius-lg); border: 1px solid var(--border); min-height: 120px;
+        background: linear-gradient(90deg, var(--surface) 0%, var(--surface-hover) 40%, var(--surface) 80%);
+        background-size: 800px 100%; animation: shimmer 1.6s linear infinite;
+    }
 </style>
 """, unsafe_allow_html=True)
 

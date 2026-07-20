@@ -12,7 +12,7 @@ from models.piotroski import PiotroskiFScore
 from models.altman import AltmanZScore
 from models.ohlson import OhlsonOScore
 from models.fear_greed import FearGreedIndex
-from theme import COLORS, style_fig
+from theme import COLORS, style_fig, progress_bar, card_html, status_pill
 
 def create_financial_models_dashboard(analyzer):
     st.markdown('<div class="section-header">📊 Advanced Financial Models</div>', unsafe_allow_html=True)
@@ -39,8 +39,8 @@ def create_financial_models_dashboard(analyzer):
             fig = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=fg['score'],
-                number={'font': {'color': fg['color'], 'size': 48}},
-                title={'text': "Fear & Greed"},
+                number={'font': {'color': fg['color'], 'size': 48, 'family': 'Inter, sans-serif'}},
+                title={'text': "Fear & Greed", 'font': {'family': 'Inter, sans-serif'}},
                 gauge={
                     'axis': {'range': [0, 100], 'tickcolor': COLORS['text_3']},
                     'bar': {'color': fg['color']},
@@ -63,9 +63,8 @@ def create_financial_models_dashboard(analyzer):
         with col2:
             for factor, score in fg['factors'].items():
                 s = int(score) if pd.notna(score) and not np.isnan(score) else 12
-                bar = '█' * s + '░' * (25 - s)
                 factor_color = COLORS['up'] if s > 15 else COLORS['neutral'] if s > 8 else COLORS['down']
-                st.markdown(f"**{factor}**: <span style='color:{factor_color}'>{bar}</span> {score}/25", unsafe_allow_html=True)
+                st.markdown(progress_bar(factor, s, 25, color=factor_color), unsafe_allow_html=True)
     
     # ===== SECTION 2: PERFORMANCE METRICS =====
     st.markdown("### 📈 Performance Metrics")
@@ -180,8 +179,11 @@ def create_financial_models_dashboard(analyzer):
         st.caption("Earnings manipulation detection")
         m_score = BeneishMScore.calculate(income, balance, cashflow)
         if m_score:
-            st.markdown(f"<h2 style='color:{m_score['color']};text-align:center;'>{m_score['m_score']}</h2>", unsafe_allow_html=True)
-            st.markdown(f"<p style='text-align:center;color:{m_score['color']};'><b>{m_score['risk']}</b></p>", unsafe_allow_html=True)
+            m_inner = (
+                f"<h2 style='color:{m_score['color']};text-align:center;margin:0;'>{m_score['m_score']}</h2>"
+                f"<p style='text-align:center;color:{m_score['color']};margin:0.35rem 0 0 0;'><b>{m_score['risk']}</b></p>"
+            )
+            st.markdown(card_html(m_inner, accent=m_score['color']), unsafe_allow_html=True)
             with st.expander("📋 Components", expanded=False):
                 st.caption(m_score['interpretation'])
                 comps = m_score['components']
@@ -212,16 +214,24 @@ def create_financial_models_dashboard(analyzer):
         st.markdown("**Piotroski F-Score**")
         st.caption("Financial strength (0-9)")
         f_score = PiotroskiFScore.calculate(income, balance, cashflow)
-        st.markdown(f"<h2 style='color:{f_score.get('color','#94a3b8')};text-align:center;'>{f_score['score']}/9</h2>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align:center;color:{f_score.get('color','#94a3b8')};'><b>{f_score['rating']}</b></p>", unsafe_allow_html=True)
+        f_color = f_score.get('color', '#94a3b8')
+        f_inner = (
+            f"<h2 style='color:{f_color};text-align:center;margin:0;'>{f_score['score']}/9</h2>"
+            f"<p style='text-align:center;color:{f_color};margin:0.35rem 0 0 0;'><b>{f_score['rating']}</b></p>"
+        )
+        st.markdown(card_html(f_inner, accent=f_color), unsafe_allow_html=True)
     
     with col3:
         st.markdown("**Altman Z-Score**")
         st.caption("Bankruptcy prediction")
         z_score = AltmanZScore.calculate(balance, income, market_cap)
         if z_score and z_score.get('z_score') and not pd.isna(z_score['z_score']):
-            st.markdown(f"<h2 style='color:{z_score.get('color','#94a3b8')};text-align:center;'>{z_score['z_score']:.2f}</h2>", unsafe_allow_html=True)
-            st.markdown(f"<p style='text-align:center;color:{z_score.get('color','#94a3b8')};'><b>{z_score['zone']}</b></p>", unsafe_allow_html=True)
+            z_color = z_score.get('color', '#94a3b8')
+            z_inner = (
+                f"<h2 style='color:{z_color};text-align:center;margin:0;'>{z_score['z_score']:.2f}</h2>"
+                f"<p style='text-align:center;color:{z_color};margin:0.35rem 0 0 0;'><b>{z_score['zone']}</b></p>"
+            )
+            st.markdown(card_html(z_inner, accent=z_color), unsafe_allow_html=True)
             st.caption(f"Probability: {z_score.get('probability','N/A')}")
         else:
             st.warning("Insufficient data")
@@ -231,8 +241,11 @@ def create_financial_models_dashboard(analyzer):
         st.caption("Bankruptcy probability (1980)")
         o_score = OhlsonOScore.calculate(income, balance, info)
         if o_score:
-            st.markdown(f"<h2 style='color:{o_score['color']};text-align:center;'>{o_score['probability']}</h2>", unsafe_allow_html=True)
-            st.markdown(f"<p style='text-align:center;color:{o_score['color']};'><b>{o_score['risk']}</b></p>", unsafe_allow_html=True)
+            o_inner = (
+                f"<h2 style='color:{o_score['color']};text-align:center;margin:0;'>{o_score['probability']}</h2>"
+                f"<p style='text-align:center;color:{o_score['color']};margin:0.35rem 0 0 0;'><b>{o_score['risk']}</b></p>"
+            )
+            st.markdown(card_html(o_inner, accent=o_score['color']), unsafe_allow_html=True)
             st.caption(o_score['interpretation'])
             with st.expander("📋 Score Contribution Breakdown", expanded=False):
                 contrib = o_score.get('contributions', {})
@@ -350,16 +363,17 @@ def create_financial_models_dashboard(analyzer):
     st.markdown("---")
     st.markdown("### 📊 Rating Scale")
     col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        st.markdown(f"<div style='background:rgba(16,185,129,0.1);border:1px solid #10b981;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#10b981;font-weight:700;'>🟢 EXCELLENT</span><br><span style='color:#94a3b8;font-size:0.7rem;'>80-100</span></div>", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"<div style='background:rgba(52,211,153,0.1);border:1px solid #34d399;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#34d399;font-weight:700;'>🟢 GOOD</span><br><span style='color:#94a3b8;font-size:0.7rem;'>60-79</span></div>", unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"<div style='background:rgba(245,158,11,0.1);border:1px solid #f59e0b;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#f59e0b;font-weight:700;'>🟡 FAIR</span><br><span style='color:#94a3b8;font-size:0.7rem;'>40-59</span></div>", unsafe_allow_html=True)
-    with col4:
-        st.markdown(f"<div style='background:rgba(239,68,68,0.1);border:1px solid #f97316;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#f97316;font-weight:700;'>🟠 POOR</span><br><span style='color:#94a3b8;font-size:0.7rem;'>20-39</span></div>", unsafe_allow_html=True)
-    with col5:
-        st.markdown(f"<div style='background:rgba(239,68,68,0.1);border:1px solid #ef4444;padding:0.5rem;border-radius:8px;text-align:center;'><span style='color:#ef4444;font-weight:700;'>🔴 CRITICAL</span><br><span style='color:#94a3b8;font-size:0.7rem;'>0-19</span></div>", unsafe_allow_html=True)
+    legend = [
+        (col1, "EXCELLENT", "80-100", "#10b981"),
+        (col2, "GOOD", "60-79", "#34d399"),
+        (col3, "FAIR", "40-59", "#f59e0b"),
+        (col4, "POOR", "20-39", "#f97316"),
+        (col5, "CRITICAL", "0-19", "#ef4444"),
+    ]
+    for col, label, rng, color in legend:
+        with col:
+            inner = f"{status_pill(label, color)}<br><span style='color:{COLORS['text_3']};font-size:0.7rem;'>{rng}</span>"
+            st.markdown(card_html(inner, accent=color, center=True), unsafe_allow_html=True)
     
     # ===== SECTION 5: COMPOSITE HEALTH SCORE =====
     st.markdown("### 🏆 Composite Financial Health Score")
@@ -370,8 +384,8 @@ def create_financial_models_dashboard(analyzer):
     with col1:
         fig = go.Figure(go.Indicator(
             mode="gauge+number", value=composite['score'],
-            number={'font': {'color': composite['color'], 'size': 48}},
-            title={'text': "Health Score"},
+            number={'font': {'color': composite['color'], 'size': 48, 'family': 'Inter, sans-serif'}},
+            title={'text': "Health Score", 'font': {'family': 'Inter, sans-serif'}},
             gauge={
                 'axis': {'range': [0, 100], 'tickcolor': COLORS['text_3']},
                 'bar': {'color': composite['color']},
@@ -391,5 +405,5 @@ def create_financial_models_dashboard(analyzer):
     with col2:
         for category, score in composite['breakdown'].items():
             s = int(score) if pd.notna(score) and not np.isnan(score) else 0
-            bar = '█' * (s // 10) + '░' * (10 - s // 10)
-            st.markdown(f"**{category}**: {bar} {s}%")
+            bar_color = COLORS['up'] if s >= 70 else COLORS['neutral'] if s >= 40 else COLORS['down']
+            st.markdown(progress_bar(category, s, 100, color=bar_color), unsafe_allow_html=True)

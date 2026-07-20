@@ -6,7 +6,8 @@ from models.dcf import AdvancedDCF
 from models.graham import GrahamValuation
 from models.epv import EarningsPowerValue
 from models.residual_income import ResidualIncome
-from theme import COLORS, style_fig, style_fig_3d, VALUE_COLORSCALE, animated_config
+from theme import COLORS, style_fig, style_fig_3d, VALUE_COLORSCALE, animated_config, card_html
+from utils.formatting import format_financial_number
 
 def create_valuation_dashboard(analyzer):
     st.markdown('<div class="section-header">💰 Advanced Valuation Models</div>', unsafe_allow_html=True)
@@ -81,7 +82,15 @@ def create_valuation_dashboard(analyzer):
         st.warning("⚠️ DCF values seem extreme. This may be due to limited financial data. Adjust parameters or try a different ticker.")
         return
     
-    st.markdown(f'<div style="background-color:{result["rec_color"]};padding:1.5rem;border-radius:16px;color:white;text-align:center;margin:1rem 0;"><h2>{result["recommendation"]}</h2><p>Intrinsic Value: {cur}{result["intrinsic_value"]:.2f} | Upside: {result["upside"]:+.1f}%</p></div>', unsafe_allow_html=True)
+    rec_inner = (
+        f'<h2 style="margin:0;color:{result["rec_color"]};">{result["recommendation"]}</h2>'
+        f'<p style="margin:0.35rem 0 0 0;color:{COLORS["text_1"]};">'
+        f'Intrinsic Value: {cur}{result["intrinsic_value"]:.2f} | Upside: {result["upside"]:+.1f}%</p>'
+    )
+    st.markdown(
+        card_html(rec_inner, accent=result["rec_color"], center=True),
+        unsafe_allow_html=True,
+    )
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Intrinsic Value", f"{cur}{result['intrinsic_value']:.2f}")
@@ -89,14 +98,18 @@ def create_valuation_dashboard(analyzer):
     col3.metric("WACC", f"{result['wacc']*100:.1f}%")
     col4.metric("Bear/Bull", f"{cur}{result['bear_case']:.0f} - {cur}{result['bull_case']:.0f}")
 
-    unit = 'Cr' if analyzer.currency == 'INR' else 'B'
-    div = 1e7 if analyzer.currency == 'INR' else 1e9
     years = [p['year'] for p in result['projections']]
-    fcf_vals = [p['fcf']/div for p in result['projections']]
-    
+    fcf_raw = [p['fcf'] for p in result['projections']]
+    fcf_labels = [format_financial_number(v, cur, analyzer.currency) for v in fcf_raw]
+
     fig = go.Figure()
-    fig.add_trace(go.Bar(x=years, y=fcf_vals, name='FCF', marker_color=COLORS['accent_1']))
-    fig.update_layout(title=f'10-Year FCF Projection ({cur}{unit})', height=350)
+    fig.add_trace(go.Bar(
+        x=years, y=fcf_raw, name='FCF', marker_color=COLORS['accent_1'],
+        text=fcf_labels, textposition='outside',
+        customdata=fcf_labels, hovertemplate='%{x}: %{customdata}<extra></extra>',
+    ))
+    fig.update_layout(title='10-Year FCF Projection', height=350,
+                       yaxis=dict(showticklabels=False, title=None))
     st.plotly_chart(style_fig(fig), use_container_width=True)
 
     eps = analyzer.ratios.get('EPS', ni/shares if ni and shares else 1)
@@ -111,7 +124,10 @@ def create_valuation_dashboard(analyzer):
     for model, val in models.items():
         if val and val > 0:
             color = COLORS['up'] if val > cp else COLORS['down'] if val < cp else COLORS['neutral']
-            fig.add_trace(go.Bar(x=[model], y=[val], marker_color=color, text=[f"{cur}{val:.2f}"], textposition='outside'))
+            fig.add_trace(go.Bar(
+                x=[model], y=[val], marker_color=color, text=[f"{cur}{val:.2f}"], textposition='outside',
+                hovertemplate=f"{model}: {cur}" + "%{y:,.2f}<extra></extra>",
+            ))
     fig.add_hline(y=cp, line_dash="dash", line_color=COLORS['text_3'])
     fig.update_layout(title='All Valuation Models', height=400, showlegend=False)
     st.plotly_chart(style_fig(fig), use_container_width=True)

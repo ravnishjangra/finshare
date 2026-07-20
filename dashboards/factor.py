@@ -2,7 +2,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 from models.factor import FactorInvesting
-from theme import COLORS, style_fig
+from theme import COLORS, style_fig, metric_card
 
 def create_factor_investing_dashboard(analyzer):
     prices = analyzer.financials.get('prices')
@@ -24,16 +24,15 @@ def create_factor_investing_dashboard(analyzer):
             score = data.get('score', 'N/A')
             classification = data.get('classification', 'N/A')
             color = data.get('color', COLORS['text_2'])
-            
-            st.markdown(f"""
-            <div style="background: linear-gradient(160deg, {COLORS['surface']}, {COLORS['bg_2']}); border: 1px solid {color}55; border-top: 2px solid {color};
-                        padding: 1rem; border-radius: 14px; text-align: center; min-height: 160px; box-shadow: 0 8px 20px rgba(0,0,0,0.25);">
-                <div style="font-size: 0.75rem; color: {COLORS['text_3']}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">{factor}</div>
-                <div style="font-size: 2rem; font-weight: 900; color: {color};">{score}</div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: {color};">{classification}</div>
-                <div style="font-size: 0.65rem; color: {COLORS['text_3']}; margin-top: 0.5rem;">{data.get('detail', '')[:60]}</div>
-            </div>
-            """, unsafe_allow_html=True)
+
+            st.markdown(
+                metric_card(
+                    label=factor, value=str(score), value_color=color, accent=color,
+                    sublabel=classification, footer=data.get('detail', '')[:60], center=True,
+                    min_height='160px',
+                ),
+                unsafe_allow_html=True,
+            )
     
     # Factor descriptions
     with st.expander("📖 What do these factors mean?"):
@@ -51,7 +50,8 @@ def create_factor_investing_dashboard(analyzer):
         fill='toself',
         name='Factor Exposure',
         line=dict(color=COLORS['accent_1'], width=2),
-        fillcolor='rgba(109,94,248,0.28)'
+        fillcolor='rgba(109,94,248,0.28)',
+        hovertemplate='%{theta}: %{r:.1f}<extra></extra>',
     ))
     fig.update_layout(
         polar=dict(
