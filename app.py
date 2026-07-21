@@ -237,8 +237,7 @@ ALL_STOCKS = get_all_stocks()
 
 @st.cache_resource(ttl=120)
 def get_cached_analyzer(ticker, exchange):
-    """Cache analyzer results for 2 minutes - reduces API calls, refreshes quickly"""
-    em = {"NSE India (.NS)":"NSE","BSE India (.BO)":"BSE","US Market":"US"}
+    em = {"Auto Detect": "Auto", "NSE India (.NS)":"NSE", "BSE India (.BO)":"BSE", "US Market":"US"}
     analyzer = ProFinancialAnalyzer(ticker, exchange=em.get(exchange, "NSE"))
     if analyzer.get_live_price():
         analyzer.fetch_financial_data()
@@ -260,7 +259,7 @@ def main():
     if 'current_ticker' not in st.session_state:
         st.session_state['current_ticker'] = "AAPL"
     if 'current_exchange' not in st.session_state:
-        st.session_state['current_exchange'] = "NSE India (.NS)"
+        st.session_state['current_exchange'] = "Auto Detect"
     if 'analyze_clicked' not in st.session_state:
         st.session_state['analyze_clicked'] = False
 
@@ -280,7 +279,7 @@ def main():
                 key="main_ticker_widget",
                 placeholder="Type any ticker (e.g., AAPL, RELIANCE, VEDL)...",
             )
-            st.caption("💡 Use ticker symbols (not company names). Add .NS for NSE, .BO for BSE. US stocks need no suffix.")
+            st.caption("💡 Use ticker symbols (not company names). Add .NS for NSE, .BO for BSE. US stocks need no suffix.If .NS don't work use .BO and vice versa")
         
         with c2:
             exchange = st.selectbox(
