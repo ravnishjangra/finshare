@@ -19,7 +19,6 @@ from dashboards.peer3d import create_peer_3d_scatter
 from dashboards.financial_models import create_financial_models_dashboard
 from components.hero3d import get_hero_html
 from theme import inject_glass
-import streamlit.components.v1 as components
 
 # Must be first Streamlit command
 st.set_page_config(page_title="Finshare Pro", page_icon="📊", layout="wide")
@@ -255,7 +254,7 @@ def main():
     ''', unsafe_allow_html=True)
 
     # ===== 3D HERO =====
-    components.html(get_hero_html(height=280), height=280, scrolling=False)
+    st.iframe(get_hero_html(height=280), height=280, scrolling=False)
 
     if 'current_ticker' not in st.session_state:
         st.session_state['current_ticker'] = "AAPL"
