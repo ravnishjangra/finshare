@@ -165,6 +165,61 @@ st.markdown("""
         background: linear-gradient(90deg, var(--surface) 0%, var(--surface-hover) 40%, var(--surface) 80%);
         background-size: 800px 100%; animation: shimmer 1.6s linear infinite;
     }
+    /* All headings */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Manrope', 'Inter', sans-serif !important;
+    letter-spacing: -0.3px !important;
+}
+
+/* Section headers */
+.section-header {
+    font-family: 'Manrope', 'Inter', sans-serif !important;
+    font-size: 1.28rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.3px !important;
+}
+
+/* Metric labels */
+.metric-label {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 1.2px !important;
+}
+
+/* Tab text */
+.stTabs [data-baseweb="tab"] {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600 !important;
+}
+
+/* Card titles */
+.card h2, .card h3 {
+    font-family: 'Manrope', 'Inter', sans-serif !important;
+    font-weight: 800 !important;
+}
+
+/* Metric values */
+.metric-value, [data-testid="stMetricValue"] {
+    font-family: 'Manrope', 'Inter', sans-serif !important;
+    font-weight: 800 !important;
+}
+
+/* Dataframe text */
+[data-testid="stDataFrame"] {
+    font-family: 'Inter', sans-serif !important;
+}
+
+/* Expander headers */
+.streamlit-expanderHeader {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+}
+
+/* Plotly charts */
+.js-plotly-plot .plotly text {
+    font-family: 'Inter', sans-serif !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
