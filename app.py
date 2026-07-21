@@ -285,7 +285,7 @@ def main():
         with c2:
             exchange = st.selectbox(
                 "Exchange",
-                ["NSE India (.NS)","BSE India (.BO)","US Market"],
+                ["Auto Detect", "NSE India (.NS)", "BSE India (.BO)", "US Market"],
                 index=0,
                 key="main_exchange_widget"
             )
@@ -297,7 +297,18 @@ def main():
         if analyze_btn:
             st.session_state['analyze_clicked'] = True
             st.session_state['current_ticker'] = ticker_input.upper().strip() if ticker_input else ''
-            st.session_state['current_exchange'] = exchange
+            
+            # Auto-detect exchange
+            final_exchange = exchange
+            if exchange == "Auto Detect":
+                ticker_upper = ticker_input.upper().strip()
+                if ticker_upper in INDIAN_STOCKS_DB or ticker_upper.endswith('.NS'):
+                    final_exchange = "NSE India (.NS)"
+                elif ticker_upper.endswith('.BO'):
+                    final_exchange = "BSE India (.BO)"
+                else:
+                    final_exchange = "US Market"
+            st.session_state['current_exchange'] = final_exchange
 
         if ticker_input and len(ticker_input) >= 1:
             search_term = ticker_input.upper().strip()
@@ -313,6 +324,18 @@ def main():
                             st.session_state['analyze_clicked'] = True
             else:
                 st.caption(f"'{ticker_input}' not in quick list but will be searched on Yahoo Finance.")
+                        # Quick-load examples
+        st.markdown("**⚡ Quick Load:**")
+        quick_cols = st.columns(5)
+        examples = [("AAPL", "US Market"), ("RELIANCE.NS", "NSE India (.NS)"), 
+                    ("TCS.NS", "NSE India (.NS)"), ("MSFT", "US Market"), ("NVDA", "US Market")]
+        for i, (stock, ex) in enumerate(examples):
+            with quick_cols[i]:
+                if st.button(f"📈 {stock}", key=f"quick_{stock}", use_container_width=True):
+                    st.session_state['current_ticker'] = stock
+                    st.session_state['current_exchange'] = ex
+                    st.session_state['analyze_clicked'] = True
+                    st.rerun()
 
         if st.session_state['analyze_clicked'] and st.session_state['current_ticker']:
             ticker_to_analyze = st.session_state['current_ticker']
