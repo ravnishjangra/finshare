@@ -1,17 +1,16 @@
-"""Animated 3D hero visual for the top of the main page.
-
-Pure decoration, rendered client-side via Three.js (loaded from a CDN
-directly in the user's browser through the iframe that
-st.components.v1.html creates) — no data, fabricated or otherwise, is
-shown here, and this never touches core/analyzer.py or the fetch path.
-"""
+"""Animated 3D hero visual — rotating Earth with orbiting data rings."""
 
 from theme import COLORS
 
 _HERO_TEMPLATE = """
 <div id="hero3d-wrap" style="position:relative;width:100%;height:{height}px;border-radius:24px;overflow:hidden;
-     background:radial-gradient(ellipse 90% 70% at 50% 20%, rgba(109,94,248,0.14), rgba(5,7,13,0) 70%);">
+     background:radial-gradient(ellipse 90% 70% at 50% 30%, rgba(30,60,120,0.25), rgba(5,7,13,0) 75%);">
   <canvas id="hero3d-canvas" style="display:block;width:100%;height:100%;"></canvas>
+  <div style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+       font-family:'Manrope','Inter',sans-serif;font-size:0.7rem;font-weight:700;
+       color:rgba(255,255,255,0.22);letter-spacing:2.5px;pointer-events:none;">
+    GLOBAL MARKET INTELLIGENCE
+  </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -21,7 +20,6 @@ _HERO_TEMPLATE = """
   if (!window.THREE || !wrap || !canvas) return;
 
   const COLOR_ACCENT_1 = {accent_1};
-  const COLOR_ACCENT_2 = {accent_2};
   const COLOR_ACCENT_3 = {accent_3};
   const COLOR_UP = {up};
 
@@ -29,84 +27,129 @@ _HERO_TEMPLATE = """
   let height = wrap.clientHeight || {height};
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(52, width / height, 0.1, 100);
-  camera.position.set(0, 0.4, 9);
+  const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+  camera.position.set(0, 0.2, 8.5);
 
   const renderer = new THREE.WebGLRenderer({{ canvas: canvas, alpha: true, antialias: true }});
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height, false);
 
-  const group = new THREE.Group();
-  scene.add(group);
+  // ── EARTH ──
+  const earthGroup = new THREE.Group();
+  scene.add(earthGroup);
 
-  // Core glowing wireframe icosahedron — the "data crystal"
-  const coreGeo = new THREE.IcosahedronGeometry(2.35, 1);
-  const coreWire = new THREE.LineSegments(
-    new THREE.EdgesGeometry(coreGeo),
-    new THREE.LineBasicMaterial({{ color: COLOR_ACCENT_1, transparent: true, opacity: 0.85 }})
-  );
-  group.add(coreWire);
+  // Earth texture from NASA Blue Marble (free, no API key)
+  const textureLoader = new THREE.TextureLoader();
+  const earthGeo = new THREE.SphereGeometry(2.2, 64, 64);
+  const earthMat = new THREE.MeshPhongMaterial({{
+    map: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg'),
+    specular: new THREE.Color('grey'),
+    shininess: 5,
+  }});
+  const earth = new THREE.Mesh(earthGeo, earthMat);
+  earthGroup.add(earth);
 
-  const coreFill = new THREE.Mesh(
-    coreGeo,
-    new THREE.MeshBasicMaterial({{ color: COLOR_ACCENT_1, transparent: true, opacity: 0.05, side: THREE.DoubleSide }})
-  );
-  group.add(coreFill);
+  // Atmosphere glow
+  const atmosGeo = new THREE.SphereGeometry(2.28, 64, 64);
+  const atmosMat = new THREE.MeshBasicMaterial({{
+    color: 0x4fc3f7,
+    transparent: true,
+    opacity: 0.08,
+    side: THREE.FrontSide,
+  }});
+  const atmosphere = new THREE.Mesh(atmosGeo, atmosMat);
+  earthGroup.add(atmosphere);
 
-  const innerGeo = new THREE.IcosahedronGeometry(1.15, 0);
-  const innerWire = new THREE.LineSegments(
-    new THREE.EdgesGeometry(innerGeo),
-    new THREE.LineBasicMaterial({{ color: COLOR_ACCENT_3, transparent: true, opacity: 0.55 }})
-  );
-  group.add(innerWire);
+  // Outer glow ring
+  const glowRingGeo = new THREE.TorusGeometry(2.35, 0.015, 16, 100);
+  const glowRingMat = new THREE.MeshBasicMaterial({{ color: COLOR_ACCENT_3, transparent: true, opacity: 0.35 }});
+  const glowRing = new THREE.Mesh(glowRingGeo, glowRingMat);
+  glowRing.rotation.x = Math.PI / 2;
+  earthGroup.add(glowRing);
 
-  // Orbiting rings — "capital flow"
-  const ringColors = [COLOR_ACCENT_3, COLOR_ACCENT_2, COLOR_UP];
+  // ── LIGHTING ──
+  const ambientLight = new THREE.AmbientLight(0x333366, 0.6);
+  scene.add(ambientLight);
+  const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  sunLight.position.set(5, 3, 7);
+  scene.add(sunLight);
+  const fillLight = new THREE.DirectionalLight(0x4466aa, 0.4);
+  fillLight.position.set(-3, -1, -2);
+  scene.add(fillLight);
+
+  // ── ORBITING DATA RINGS ──
+  const ringData = [
+    {{ radius: 3.0, color: COLOR_ACCENT_3, opacity: 0.4, tilt: 0.3, speed: 0.6 }},
+    {{ radius: 3.5, color: 0x6d5ef8, opacity: 0.3, tilt: -0.5, speed: -0.4 }},
+    {{ radius: 4.0, color: COLOR_UP, opacity: 0.25, tilt: 0.7, speed: 0.3 }},
+  ];
   const rings = [];
-  for (let i = 0; i < 3; i++) {{
-    const ringGeo = new THREE.TorusGeometry(3.1 + i * 0.42, 0.006, 8, 96);
-    const ringMat = new THREE.MeshBasicMaterial({{ color: ringColors[i], transparent: true, opacity: 0.4 - i * 0.08 }});
+  ringData.forEach(function(d) {{
+    const ringGeo = new THREE.TorusGeometry(d.radius, 0.004, 8, 140);
+    const ringMat = new THREE.MeshBasicMaterial({{ color: d.color, transparent: true, opacity: d.opacity }});
     const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = Math.PI / 2.4 + i * 0.35;
-    ring.rotation.y = i * 0.6;
+    ring.rotation.x = Math.PI / 2 + d.tilt;
     scene.add(ring);
-    rings.push(ring);
+    rings.push({{ mesh: ring, speed: d.speed, tilt: d.tilt }});
+  }});
+
+  // ── SATELLITE DOTS ──
+  const satellites = [];
+  for (let i = 0; i < 8; i++) {{
+    const dotGeo = new THREE.SphereGeometry(0.04, 6, 6);
+    const dotMat = new THREE.MeshBasicMaterial({{ color: i < 4 ? COLOR_ACCENT_3 : COLOR_UP, transparent: true, opacity: 0.85 }});
+    const dot = new THREE.Mesh(dotGeo, dotMat);
+    dot.userData = {{
+      radius: 2.5 + Math.random() * 2.2,
+      speed: 0.4 + Math.random() * 0.9,
+      offset: Math.random() * Math.PI * 2,
+      tilt: (Math.random() - 0.5) * 1.2,
+      yOffset: (Math.random() - 0.5) * 1.5,
+    }};
+    scene.add(dot);
+    satellites.push(dot);
   }}
 
-  // Particle field — "market data points"
-  const PARTICLE_COUNT = 260;
-  const positions = new Float32Array(PARTICLE_COUNT * 3);
-  const seeds = new Float32Array(PARTICLE_COUNT);
-  for (let i = 0; i < PARTICLE_COUNT; i++) {{
-    const r = 3.6 + Math.random() * 2.6;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos((Math.random() * 2) - 1);
-    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.6;
-    positions[i * 3 + 2] = r * Math.cos(phi);
-    seeds[i] = Math.random() * Math.PI * 2;
+  // ── STARFIELD ──
+  const STAR_COUNT = 300;
+  const starPositions = new Float32Array(STAR_COUNT * 3);
+  for (let i = 0; i < STAR_COUNT; i++) {{
+    starPositions[i * 3] = (Math.random() - 0.5) * 18;
+    starPositions[i * 3 + 1] = (Math.random() - 0.5) * 12;
+    starPositions[i * 3 + 2] = (Math.random() - 0.5) * 10 - 3;
   }}
-  const particleGeo = new THREE.BufferGeometry();
-  particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const particleMat = new THREE.PointsMaterial({{
-    color: COLOR_ACCENT_3, size: 0.045, transparent: true, opacity: 0.75,
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+  const starMat = new THREE.PointsMaterial({{
+    color: 0xffffff, size: 0.03, transparent: true, opacity: 0.6,
     blending: THREE.AdditiveBlending, depthWrite: false,
   }});
-  const particles = new THREE.Points(particleGeo, particleMat);
-  scene.add(particles);
+  const stars = new THREE.Points(starGeo, starMat);
+  scene.add(stars);
 
-  // Gentle mouse parallax
+  // ── MOUSE / TOUCH CONTROL ──
   let targetRotX = 0, targetRotY = 0;
+  let currentRotX = 0, currentRotY = 0;
+  let isDragging = false;
+
   wrap.addEventListener('mousemove', function(e) {{
     const rect = wrap.getBoundingClientRect();
     const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1;
-    targetRotY = nx * 0.35;
-    targetRotX = ny * 0.2;
+    targetRotY = nx * 1.2;
+    targetRotX = ny * 0.7;
   }});
 
-  let raf = null;
-  let running = true;
+  wrap.addEventListener('touchmove', function(e) {{
+    const rect = wrap.getBoundingClientRect();
+    const nx = ((e.touches[0].clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = ((e.touches[0].clientY - rect.top) / rect.height) * 2 - 1;
+    targetRotY = nx * 1.2;
+    targetRotX = ny * 0.7;
+  }}, {{ passive: true }});
+
+  // ── ANIMATION LOOP ──
+  let raf = null, running = true;
   const clock = new THREE.Clock();
 
   function animate() {{
@@ -114,19 +157,35 @@ _HERO_TEMPLATE = """
     raf = requestAnimationFrame(animate);
     const t = clock.getElapsedTime();
 
-    group.rotation.y += 0.0032;
-    group.rotation.x += (targetRotX - group.rotation.x) * 0.02 + 0.0006;
-    group.rotation.y += (targetRotY * 0.15);
+    // Smooth mouse follow
+    currentRotX += (targetRotX - currentRotX) * 0.025;
+    currentRotY += (targetRotY - currentRotY) * 0.025;
 
-    rings.forEach(function(ring, i) {{
-      ring.rotation.z += 0.0016 * (i % 2 === 0 ? 1 : -1);
+    // Earth auto-rotation + mouse influence
+    earthGroup.rotation.y += 0.003;
+    earthGroup.rotation.x = currentRotX * 0.4;
+    earthGroup.rotation.z = currentRotY * 0.25;
+
+    // Atmosphere pulse
+    atmosMat.opacity = 0.06 + Math.sin(t * 0.5) * 0.03;
+
+    // Rings
+    rings.forEach(function(r) {{
+      r.mesh.rotation.z += 0.001 * r.speed;
     }});
 
-    particles.rotation.y -= 0.0011;
-    particleMat.opacity = 0.55 + Math.sin(t * 0.6) * 0.2;
+    // Satellites orbit
+    satellites.forEach(function(s) {{
+      const angle = t * s.userData.speed + s.userData.offset;
+      const r = s.userData.radius;
+      s.position.x = Math.cos(angle) * r;
+      s.position.z = Math.sin(angle) * r;
+      s.position.y = Math.sin(angle * 0.7) * s.userData.yOffset;
+    }});
 
-    const pulse = 1 + Math.sin(t * 1.1) * 0.02;
-    coreWire.scale.set(pulse, pulse, pulse);
+    // Stars slow drift
+    stars.rotation.y += 0.0002;
+    stars.rotation.x += 0.0001;
 
     renderer.render(scene, camera);
   }}
@@ -155,8 +214,6 @@ _HERO_TEMPLATE = """
 
 
 def get_hero_html(height: int = 300) -> str:
-    """Returns a self-contained HTML/JS snippet (Three.js) for use with
-    st.components.v1.html(get_hero_html(), height=..., scrolling=False)."""
     return _HERO_TEMPLATE.format(
         height=height,
         accent_1=repr(COLORS["accent_1"]),
